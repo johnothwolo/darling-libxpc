@@ -29,6 +29,8 @@
 #include <time.h>
 #include "xpc/xpc.h"
 #include "xpc_internal.h"
+#include <mach/clock.h>
+#include <mach/mach.h>
 
 struct _xpc_type_s {
 };
@@ -260,7 +262,14 @@ xpc_date_create_from_current(void)
 	xpc_u val;
 	struct timespec tp;
 
-	clock_gettime(CLOCK_REALTIME, &tp);
+	// clock_gettime(CLOCK_REALTIME, &tp);
+	clock_serv_t cclock;
+	mach_timespec_t mts;
+	host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+	clock_get_time(cclock, &mts);
+	mach_port_deallocate(mach_task_self(), cclock);
+	tp.tv_sec = mts.tv_sec;
+	tp.tv_nsec = mts.tv_nsec;
 
 	val.ui = *(uint64_t *)&tp;
 	return _xpc_prim_create(_XPC_TYPE_DATE, val, 1);

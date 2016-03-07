@@ -1,84 +1,39 @@
-#
-# Copyright 2015 iXsystems, Inc.
-# All rights reserved
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted providing that the following conditions
-# are met:
-# 1. Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-# 2. Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-#
-# THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-# IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-# OR SERVICES LOSS OF USE, DATA, OR PROFITS OR BUSINESS INTERRUPTION)
-# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
-# IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
-#
+project(xpc)
 
-cmake_minimum_required(VERSION 3.2)
-project(libxpc)
+cmake_minimum_required(VERSION 2.4.0)
+enable_language(C ASM)
 
-set(BASE_SOURCES
-    mpack.c
-    xpc_array.c
-    xpc_connection.c
-    xpc_dictionary.c
-    xpc_misc.c
-    xpc_type.c
+if(COMMAND cmake_policy)
+	cmake_policy(SET CMP0003 NEW)
+endif(COMMAND cmake_policy)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse -msse2 -msse3 -w -nostdinc -fblocks")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__DARWIN_UNIX03 -fPIC -w")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -nostdlib -Wl,--version-script=${DARLING_TOP_DIRECTORY}/darwin.map")
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/)
+include_directories(${DARLING_TOP_DIRECTORY}/platform-include)
+include_directories(${DARLING_TOP_DIRECTORY}/src/external/libdispatch)
+include_directories(${DARLING_TOP_DIRECTORY}/src/launchd/liblaunch)
+include_directories(${DARLING_TOP_DIRECTORY}/src/libc/fbsdcompat)
+
+set(xpc_sources
+	mpack.c
+	xpc_array.c
+	xpc_connection.c
+	xpc_dictionary.c
+	xpc_misc.c
+	xpc_private.c
+	xpc_type.c
+	transports/mach.c
 )
 
-set(HEADERS
-    activity.h
-    base.h
-    connection.h
-    debug.h
-    endpoint.h
-    launchd.h
-    xpc.h
-)
+SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/darling")
+SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE) 
+SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-set(UNIX_TRANSPORT_SOURCES
-    transports/unix.c
-)
+add_library(xpc SHARED ${xpc_sources})
+target_link_libraries(xpc system)
+install(TARGETS xpc DESTINATION ${CMAKE_INSTALL_LIBDIR}/darling)
 
-set(MACH_TRANSPORT_SOURCES
-    transports/mach.c
-)
 
-set(SOURCES
-    ${BASE_SOURCES}
-    ${UNIX_TRANSPORT_SOURCES}
-)
-
-option(XPC_DEBUG "Adds debugging output" OFF)
-option(MACH "Adds Mach transport support" OFF)
-
-if(XPC_DEBUG)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0")
-    add_definitions(-DXPC_DEBUG)
-endif()
-
-if(MACH)
-    set(SOURCES
-        ${SOURCES}
-        ${MACH_TRANSPORT_SOURCES}
-    )
-    include_directories(/usr/include/apple)
-    add_definitions(-DMACH -D__APPLE__)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -lSystem")
-endif()
-
-include_directories(/usr/local/include)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fblocks -Wall -Wextra")
-add_library(xpc SHARED ${SOURCES})
-add_subdirectory(examples)
