@@ -31,7 +31,7 @@
 #include <Block.h>
 #include "xpc_internal.h"
 
-#define XPC_CONNECTION_NEXT_ID(conn) (atomic_fetchadd_long(&conn->xc_last_id, 1))
+#define XPC_CONNECTION_NEXT_ID(conn) (__sync_fetch_and_add(&conn->xc_last_id, 1))
 
 static void xpc_send(xpc_connection_t xconn, xpc_object_t message, uint64_t id);
 

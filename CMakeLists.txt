@@ -9,13 +9,15 @@ endif(COMMAND cmake_policy)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse -msse2 -msse3 -w -nostdinc -fblocks")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__DARWIN_UNIX03 -fPIC -w")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -nostdlib -Wl,--version-script=${DARLING_TOP_DIRECTORY}/darwin.map")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -nostdlib")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/)
-include_directories(${DARLING_TOP_DIRECTORY}/platform-include)
-include_directories(${DARLING_TOP_DIRECTORY}/src/external/libdispatch)
-include_directories(${DARLING_TOP_DIRECTORY}/src/launchd/liblaunch)
-include_directories(${DARLING_TOP_DIRECTORY}/src/libc/fbsdcompat)
+include_directories(${CMAKE_SOURCE_DIR}/platform-include)
+include_directories(${CMAKE_SOURCE_DIR}/src/external/libdispatch)
+include_directories(${CMAKE_SOURCE_DIR}/src/launchd/liblaunch)
+include_directories(${CMAKE_SOURCE_DIR}/src/libc/fbsdcompat)
+
+add_definitions(-DMACH)
 
 set(xpc_sources
 	mpack.c
@@ -26,14 +28,25 @@ set(xpc_sources
 	xpc_private.c
 	xpc_type.c
 	transports/mach.c
+	subr_sbuf.c
 )
 
-SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/darling")
-SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE) 
-SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-add_library(xpc SHARED ${xpc_sources})
-target_link_libraries(xpc system)
-install(TARGETS xpc DESTINATION ${CMAKE_INSTALL_LIBDIR}/darling)
+set(DYLIB_INSTALL_NAME "/usr/lib/system/libxpc.dylib")
+add_circular(xpc FAT
+	SOURCES
+		${xpc_sources}
+	SIBLINGS
+		system_c
+		system_kernel
+		system_blocks
+		libdispatch_shared
+		platform
+		system_malloc
+		launch
+		system_info
+		system_dyld
+)
+#target_link_libraries(xpc system)
+install(TARGETS xpc DESTINATION libexec/darling/usr/lib/system)
 
 

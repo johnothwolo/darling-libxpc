@@ -162,7 +162,7 @@ mach_send(xpc_port_t local, xpc_port_t remote, void *buf, size_t len,
 
 	debugf("local=%d remote=%d", src, dst);
 
-	msg_size = _ALIGN(len + sizeof(struct xpc_message));
+	msg_size = ALIGN(len + sizeof(struct xpc_message));
 	message->header.msgh_size = msg_size;
 	message->header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND,
 	    MACH_MSG_TYPE_MAKE_SEND);

@@ -36,6 +36,7 @@
 #include "xpc_internal.h"
 
 #define RECV_BUFFER_SIZE	65536
+#define sbuf_new_auto() sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND)
 
 static void xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf,
     int level);
@@ -50,8 +51,10 @@ xpc_get_transport()
 	if (!selected_transport) {
 		char *env = getenv("XPC_TRANSPORT");
 		if (env) {
+#if 0
 			if (!strcmp(env, "unix"))
 				selected_transport = &unix_transport;
+#endif
 
 			if (!strcmp(env, "mach"))
 				selected_transport = &mach_transport;
@@ -160,7 +163,7 @@ xpc_retain(xpc_object_t obj)
 	struct xpc_object *xo;
 
 	xo = obj;
-	atomic_add_int(&xo->xo_refcnt, 1);
+	__sync_fetch_and_add(&xo->xo_refcnt, 1);
 	return (obj);
 }
 
@@ -170,7 +173,7 @@ xpc_release(xpc_object_t obj)
 	struct xpc_object *xo;
 
 	xo = obj;
-	if (atomic_fetchadd_int(&xo->xo_refcnt, -1) > 1)
+	if (__sync_fetch_and_add(&xo->xo_refcnt, -1) > 1)
 		return;
 
 	xpc_object_destroy(xo);
@@ -213,7 +216,11 @@ static void
 xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf, int level)
 {
 	struct xpc_object *xo = obj;
+#ifndef __APPLE__
 	struct uuid *id;
+#else
+	uuid_t id;
+#endif
 	char *uuid_str;
 	uint32_t uuid_status;
 
@@ -269,8 +276,14 @@ xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf, int level)
 		break;	
 
 	case _XPC_TYPE_UUID:
+#ifdef __APPLE__
+		memcpy(id, xpc_uuid_get_bytes(obj), sizeof(id));
+		uuid_str = (char*) __builtin_alloca(40);
+		uuid_unparse(*id, uuid_str);
+#else
 		id = (struct uuid *)xpc_uuid_get_bytes(obj);
 		uuid_to_string(id, &uuid_str, &uuid_status);
+#endif
 		sbuf_printf(sbuf, "%s\n", uuid_str);
 		free(uuid_str);
 		break;
