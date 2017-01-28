@@ -14,6 +14,7 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -nostdlib")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/)
 include_directories(${CMAKE_SOURCE_DIR}/platform-include)
 include_directories(${CMAKE_SOURCE_DIR}/src/external/libdispatch)
+include_directories(${CMAKE_SOURCE_DIR}/src/external/libclosure)
 include_directories(${CMAKE_SOURCE_DIR}/src/launchd/liblaunch)
 include_directories(${CMAKE_SOURCE_DIR}/src/libc/fbsdcompat)
 
