@@ -62,15 +62,6 @@ typedef const struct _xpc_bool_s xb;
 xb _xpc_bool_true;
 xb _xpc_bool_false;
 
-struct _xpc_dictionary_s {
-};
-
-typedef const struct _xpc_dictionary_s xs;
-
-xs _xpc_error_connection_interrupted;
-xs _xpc_error_connection_invalid;
-xs _xpc_error_connection_imminent;
-
 static size_t xpc_data_hash(const uint8_t *data, size_t length);
 
 static xpc_type_t xpc_typemap[] = {
@@ -428,6 +419,11 @@ xpc_type_t
 xpc_get_type(xpc_object_t obj)
 {
 	struct xpc_object *xo;
+
+	if (obj == (xpc_object_t) XPC_ERROR_CONNECTION_INTERRUPTED ||
+	    obj == (xpc_object_t) XPC_ERROR_CONNECTION_INVALID ||
+	    obj == (xpc_object_t) XPC_ERROR_TERMINATION_IMMINENT)
+		return XPC_TYPE_ERROR;
 
 	xo = obj;
 	return (xpc_typemap[xo->xo_xpc_type]);

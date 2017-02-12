@@ -25,15 +25,14 @@ set(xpc_sources
 	xpc_misc.c
 	xpc_private.c
 	xpc_type.c
+	xpc_errors.c
 	transports/mach.c
 )
 
 SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/darling")
-SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE) 
+SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 add_library(xpc SHARED ${xpc_sources})
 target_link_libraries(xpc system)
 install(TARGETS xpc DESTINATION ${CMAKE_INSTALL_LIBDIR}/darling)
-
-
