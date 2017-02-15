@@ -36,6 +36,7 @@ struct _xpc_type_s {
 };
 
 typedef const struct _xpc_type_s xt;
+xt _xpc_type_activity;
 xt _xpc_type_array;
 xt _xpc_type_bool;
 xt _xpc_type_connection;
@@ -72,7 +73,7 @@ static xpc_type_t xpc_typemap[] = {
 	XPC_TYPE_CONNECTION,
 	XPC_TYPE_ENDPOINT,
 	XPC_TYPE_NULL,
-	NULL,
+	XPC_TYPE_ACTIVITY,
 	XPC_TYPE_INT64,
 	XPC_TYPE_UINT64,
 	XPC_TYPE_DATE,
@@ -93,7 +94,7 @@ static const char *xpc_typestr[] = {
 	"connection",
 	"endpoint",
 	"null",
-	"invalid",
+	"activity",
 	"int64",
 	"uint64",
 	"date",
@@ -135,6 +136,9 @@ _xpc_prim_create_flags(int type, xpc_u value, size_t size, uint16_t flags)
 
 	if (type == _XPC_TYPE_ARRAY)
 		TAILQ_INIT(&xo->xo_array);
+
+	if (type == _XPC_TYPE_ACTIVITY)
+		xo->xo_activity.criteria = xpc_dictionary_create(NULL, NULL, 0);
 
 	return (xo);
 }

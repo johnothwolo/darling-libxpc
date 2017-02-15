@@ -96,6 +96,12 @@ xpc_array_destroy(struct xpc_object *dict)
 	}
 }
 
+static void
+xpc_activity_destroy(struct xpc_object *activity)
+{
+	xpc_release(activity->xo_activity.criteria);
+}
+
 static int
 xpc_pack(struct xpc_object *xo, void **buf, uint64_t id, size_t *size)
 {
@@ -150,6 +156,9 @@ xpc_object_destroy(struct xpc_object *xo)
 
 	if (xo->xo_xpc_type == _XPC_TYPE_ARRAY)
 		xpc_array_destroy(xo);
+
+	if (xo->xo_xpc_type == _XPC_TYPE_ACTIVITY)
+		xpc_activity_destroy(xo);
 
 	free(xo);
 }
@@ -281,6 +290,10 @@ xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf, int level)
 
 	case _XPC_TYPE_NULL:
 		sbuf_printf(sbuf, "<null>\n");
+		break;
+
+	case _XPC_TYPE_ACTIVITY:
+		sbuf_printf(sbuf, "<activity>\n");
 		break;
 	}
 }
