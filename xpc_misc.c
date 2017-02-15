@@ -28,7 +28,7 @@
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/sbuf.h>
-#include <machine/atomic.h>
+#include <libkern/OSAtomic.h>
 #include <assert.h>
 #include <syslog.h>
 #include <pthread.h>
@@ -160,7 +160,7 @@ xpc_retain(xpc_object_t obj)
 	struct xpc_object *xo;
 
 	xo = obj;
-	atomic_add_int(&xo->xo_refcnt, 1);
+	OSAtomicIncrement32(&xo->xo_refcnt);
 	return (obj);
 }
 
@@ -170,7 +170,7 @@ xpc_release(xpc_object_t obj)
 	struct xpc_object *xo;
 
 	xo = obj;
-	if (atomic_fetchadd_int(&xo->xo_refcnt, -1) > 1)
+	if (OSAtomicDecrement32(&xo->xo_refcnt) > 1)
 		return;
 
 	xpc_object_destroy(xo);

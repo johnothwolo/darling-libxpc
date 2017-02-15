@@ -27,11 +27,11 @@
 
 #include <errno.h>
 #include <xpc/xpc.h>
-#include <machine/atomic.h>
+#include <libkern/OSAtomic.h>
 #include <Block.h>
 #include "xpc_internal.h"
 
-#define XPC_CONNECTION_NEXT_ID(conn) (atomic_fetchadd_long(&conn->xc_last_id, 1))
+#define XPC_CONNECTION_NEXT_ID(conn) OSAtomicIncrement64(&conn->xc_last_id)
 
 static void xpc_send(xpc_connection_t xconn, xpc_object_t message, uint64_t id);
 
