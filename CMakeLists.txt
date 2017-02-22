@@ -22,9 +22,11 @@ add_definitions(-DMACH)
 
 set(xpc_sources
 	mpack.c
+	xpc_activity.c
 	xpc_array.c
 	xpc_connection.c
 	xpc_dictionary.c
+	xpc_errors.c
 	xpc_misc.c
 	xpc_private.c
 	xpc_type.c
@@ -49,5 +51,4 @@ add_circular(xpc FAT
 )
 #target_link_libraries(xpc system)
 install(TARGETS xpc DESTINATION libexec/darling/usr/lib/system)
-
 

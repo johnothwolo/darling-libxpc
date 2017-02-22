@@ -51,6 +51,7 @@
 #define _XPC_TYPE_CONNECTION		4
 #define _XPC_TYPE_ENDPOINT		5
 #define	_XPC_TYPE_NULL			6
+#define _XPC_TYPE_ACTIVITY		7
 #define _XPC_TYPE_INT64			8
 #define _XPC_TYPE_UINT64		9
 #define _XPC_TYPE_DATE			10
@@ -99,6 +100,10 @@ typedef union {
 	uintptr_t ptr;
 	int fd;
 	uuid_t uuid;
+    struct {
+        struct xpc_object * criteria;
+        xpc_activity_state_t state;
+    } activity;
 #ifdef MACH
 	mach_port_t port;
 #endif
@@ -209,6 +214,7 @@ struct xpc_service {
 #define xo_port xo_u.port
 #define xo_array xo_u.array
 #define xo_dict xo_u.dict
+#define xo_activity xo_u.activity
 
 __private_extern__ struct xpc_transport *xpc_get_transport();
 __private_extern__ void xpc_set_transport(struct xpc_transport *);
