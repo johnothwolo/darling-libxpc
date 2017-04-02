@@ -28,48 +28,55 @@
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/sbuf.h>
+#include <mach/mach.h>
+#include <xpc/launchd.h>
 #include <libkern/OSAtomic.h>
 #include <assert.h>
 #include <syslog.h>
-#include <pthread.h>
-#include "xpc/xpc.h"
-#include "xpc/launchd.h"
+#include <stdarg.h>
+#include <uuid/uuid.h>
+
 #include "xpc_internal.h"
 
-#define RECV_BUFFER_SIZE	65536
 #define sbuf_new_auto() sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND)
+
+#define MAX_RECV 8192
+#define XPC_RECV_SIZE			\
+    MAX_RECV - 				\
+    sizeof(mach_msg_header_t) - 	\
+    sizeof(mach_msg_trailer_t) - 	\
+    sizeof(uint64_t) - 			\
+    sizeof(size_t)
+
+struct xpc_message {
+	mach_msg_header_t header;
+	size_t size;
+	uint64_t id;
+	char data[0];
+	mach_msg_trailer_t trailer;
+};
+
+struct xpc_recv_message {
+	mach_msg_header_t header;
+	size_t size;
+	uint64_t id;
+	char data[XPC_RECV_SIZE];
+	mach_msg_trailer_t trailer;
+};
 
 static void xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf,
     int level);
 
-extern struct xpc_transport unix_transport __attribute__((weak));
-extern struct xpc_transport mach_transport __attribute__((weak));
-static struct xpc_transport *selected_transport = NULL;
-
-struct xpc_transport *
-xpc_get_transport()
+void
+fail_log(const char *exp)
 {
-	if (!selected_transport) {
-		char *env = getenv("XPC_TRANSPORT");
-		if (env) {
-#if 0
-			if (!strcmp(env, "unix"))
-				selected_transport = &unix_transport;
-#endif
-
-			if (!strcmp(env, "mach"))
-				selected_transport = &mach_transport;
-		} else {
-#ifdef MACH
-			selected_transport = &mach_transport;
-#else
-			selected_transport = &unix_transport;
-#endif
-		}
-	}
-
-	return (selected_transport);
+	syslog(LOG_ERR, "%s", exp);
+	//sleep(1);
+	printf("%s", exp);
+	//abort();
 }
+
+static void nvlist_add_prim(nvlist_t *nv, const char *key, xpc_object_t xobj);
 
 static void
 xpc_dictionary_destroy(struct xpc_object *dict)
@@ -100,55 +107,32 @@ xpc_array_destroy(struct xpc_object *dict)
 	}
 }
 
-static void
-xpc_activity_destroy(struct xpc_object *activity)
-{
-	xpc_release(activity->xo_activity.criteria);
-}
-
 static int
-xpc_pack(struct xpc_object *xo, void **buf, uint64_t id, size_t *size)
+xpc_pack(struct xpc_object *xo, void *buf, size_t *size)
 {
-	struct xpc_frame_header *header;
-	mpack_writer_t writer;
-	char *packed, *ret;
-	size_t packed_size;
+	nvlist_t *nv;
+	void *packed;
 
-	mpack_writer_init_growable(&writer, &packed, &packed_size);
-	xpc2mpack(&writer, xo);
+	nv = xpc2nv(xo);
 
-	if (mpack_writer_destroy(&writer) != mpack_ok)
+	packed = nvlist_pack_buffer(nv, NULL, size);
+	if (packed == NULL) {
+		errno = EINVAL;
 		return (-1);
+	}
 
-	ret = malloc(packed_size + sizeof(*header));
-	memset(ret, 0, packed_size + sizeof(*header));
-
-	header = (struct xpc_frame_header *)ret;
-	header->length = packed_size;
-	header->id = id;
-	header->version = XPC_PROTOCOL_VERSION;
-
-	memcpy(ret + sizeof(*header), packed, packed_size);
-	*buf = ret;
-	*size = packed_size + sizeof(*header);
-
-	free(packed);
+	memcpy(buf, packed, *size);
 	return (0);
 }
 
 static struct xpc_object *
 xpc_unpack(void *buf, size_t size)
 {
-	mpack_tree_t tree;
 	struct xpc_object *xo;
+	nvlist_t *nv;
 
-	mpack_tree_init(&tree, (const char *)buf, size);
-	if (mpack_tree_error(&tree) != mpack_ok) {
-		debugf("unpack failed: %d", mpack_tree_error(&tree))
-		return (NULL);
-	}
-
-	xo = mpack2xpc(mpack_tree_root(&tree));
+	nv = nvlist_unpack(buf, size);
+	xo = nv2xpc(nv);
 	return (xo);
 }
 
@@ -160,9 +144,6 @@ xpc_object_destroy(struct xpc_object *xo)
 
 	if (xo->xo_xpc_type == _XPC_TYPE_ARRAY)
 		xpc_array_destroy(xo);
-
-	if (xo->xo_xpc_type == _XPC_TYPE_ACTIVITY)
-		xpc_activity_destroy(xo);
 
 	free(xo);
 }
@@ -195,6 +176,7 @@ static const char *xpc_errors[] = {
 	"Invalid Argument",
 	"No Such Process"
 };
+
 
 const char *
 xpc_strerror(int error)
@@ -269,17 +251,17 @@ xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf, int level)
 		break;
 
 	case _XPC_TYPE_INT64:
-		sbuf_printf(sbuf, "%ld\n",
+		sbuf_printf(sbuf, "%lld\n",
 		    xpc_int64_get_value(obj));
 		break;
 
 	case _XPC_TYPE_UINT64:
-		sbuf_printf(sbuf, "%lx\n",
+		sbuf_printf(sbuf, "0x%llx\n",
 		    xpc_uint64_get_value(obj));
 		break;
 
 	case _XPC_TYPE_DATE:
-		sbuf_printf(sbuf, "%lu\n",
+		sbuf_printf(sbuf, "%llu\n",
 		    xpc_date_get_value(obj));
 		break;	
 
@@ -297,20 +279,15 @@ xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf, int level)
 		break;
 
 	case _XPC_TYPE_ENDPOINT:
-		sbuf_printf(sbuf, "<%ld>\n", xo->xo_int);
+		sbuf_printf(sbuf, "<%d>\n", xo->xo_int);
 		break;
 
 	case _XPC_TYPE_NULL:
 		sbuf_printf(sbuf, "<null>\n");
 		break;
-
-	case _XPC_TYPE_ACTIVITY:
-		sbuf_printf(sbuf, "<activity>\n");
-		break;
 	}
 }
 
-#ifdef MACH
 struct _launch_data {
 	uint64_t type;
 	union {
@@ -376,7 +353,6 @@ ld2xpc(launch_data_t ld)
 	}
 	return (xo);
 }
-#endif
 
 xpc_object_t
 xpc_copy_entitlement_for_token(const char *key __unused, audit_token_t *token __unused)
@@ -390,85 +366,199 @@ xpc_copy_entitlement_for_token(const char *key __unused, audit_token_t *token __
 xpc_object_t
 xpc_copy_entitlements_for_pid(pid_t pid)
 {
-	xpc_u val;
+    xpc_u val;
 
-	val.b = true;
-	return (_xpc_prim_create(_XPC_TYPE_BOOL, val,0));
+    val.b = true;
+    return (_xpc_prim_create(_XPC_TYPE_BOOL, val,0));
+}
+
+
+#define XPC_RPORT "XPC remote port"
+int
+xpc_pipe_routine_reply(xpc_object_t xobj)
+{
+	struct xpc_object *xo;
+	size_t size, msg_size;
+	struct xpc_message *message;
+	kern_return_t kr;
+	int err;
+
+	xo = xobj;
+	assert(xo->xo_xpc_type == _XPC_TYPE_DICTIONARY);
+//	size = nvlist_size(xo->xo_nv);
+	msg_size = size + sizeof(mach_msg_header_t) + sizeof(size_t);
+	if ((message = malloc(msg_size)) == NULL)
+		return (ENOMEM);
+	//if (xpc2nv(xobj, &message->data, &size) == NULL)
+	//	return (EINVAL);
+
+	message->header.msgh_size = msg_size;
+	message->header.msgh_remote_port = xpc_dictionary_copy_mach_send(xobj, XPC_RPORT);
+	message->header.msgh_local_port = MACH_PORT_NULL;
+	message->size = size;
+	kr = mach_msg_send(&message->header);
+	if (kr != KERN_SUCCESS)
+		err = (kr == KERN_INVALID_TASK) ? EPIPE : EINVAL;
+	else
+		err = 0;
+	free(message);
+	return (err);
 }
 
 int
-xpc_pipe_send(xpc_object_t xobj, uint64_t id, xpc_port_t local, xpc_port_t remote)
+xpc_pipe_send(xpc_object_t xobj, mach_port_t dst, mach_port_t local,
+    uint64_t id)
 {
-	struct xpc_transport *transport = xpc_get_transport();
-	void *buf;
-	size_t size;
+	struct xpc_object *xo;
+	size_t size, msg_size;
+	struct xpc_message *message;
+	kern_return_t kr;
+	int err;
 
-	assert(xpc_get_type(xobj) == &_xpc_type_dictionary);
+	xo = xobj;
+	assert(xo->xo_xpc_type == _XPC_TYPE_DICTIONARY);
 
-	if (xpc_pack(xobj, &buf, id, &size) != 0) {
-		debugf("pack failed");
-		return (-1);
-	}
+	if ((message = malloc(msg_size)) == NULL)
+		return (ENOMEM);
 
-	if (transport->xt_send(local, remote, buf, size, NULL, 0) != 0) {
-		debugf("transport send function failed: %s", strerror(errno));
-		return (-1);
-	}
+	if (xpc_pack(xo, &message->data, &size) != 0)
+		return (EINVAL);
 
+	msg_size = ALIGN(size + sizeof(mach_msg_header_t) + sizeof(size_t) + sizeof(uint64_t));
+	message->header.msgh_size = msg_size;
+	message->header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND,
+	    MACH_MSG_TYPE_MAKE_SEND);
+	message->header.msgh_remote_port = dst;
+	message->header.msgh_local_port = local;
+	message->id = id;
+	message->size = size;
+	kr = mach_msg_send(&message->header);
+	if (kr != KERN_SUCCESS)
+		err = (kr == KERN_INVALID_TASK) ? EPIPE : EINVAL;
+	else
+		err = 0;
+	free(message);
+	return (err);	
+}
+
+#define LOG(...)	\
+	do {            \
+	syslog(LOG_ERR, "%s:%u: ", __FILE__, __LINE__);	\
+	syslog(LOG_ERR, __VA_ARGS__);					\
+	} while (0)
+
+int
+xpc_pipe_receive(mach_port_t local, mach_port_t *remote, xpc_object_t *result,
+    uint64_t *id)
+{
+	struct xpc_recv_message message;
+	mach_msg_header_t *request;
+	kern_return_t kr;
+	mig_reply_error_t response;
+	mach_msg_trailer_t *tr;
+	int data_size;
+	struct xpc_object *xo;
+	audit_token_t *auditp;
+	xpc_u val;
+
+	request = &message.header;
+	/* should be size - but what about arbitrary XPC data? */
+	request->msgh_size = MAX_RECV;
+	request->msgh_local_port = local;
+	kr = mach_msg(request, MACH_RCV_MSG |
+	    MACH_RCV_TRAILER_TYPE(MACH_MSG_TRAILER_FORMAT_0) |
+	    MACH_RCV_TRAILER_ELEMENTS(MACH_RCV_TRAILER_AUDIT),
+	    0, request->msgh_size, request->msgh_local_port,
+	    MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+
+	if (kr != 0)
+		LOG("mach_msg_receive returned %d\n", kr);
+	*remote = request->msgh_remote_port;
+	*id = message.id;
+	data_size = message.size;
+	LOG("unpacking data_size=%d", data_size);
+	xo = xpc_unpack(&message.data, data_size);
+
+	tr = (mach_msg_trailer_t *)(((char *)&message) + request->msgh_size);
+	auditp = &((mach_msg_audit_trailer_t *)tr)->msgh_audit;
+
+	xo->xo_audit_token = malloc(sizeof(*auditp));
+	memcpy(xo->xo_audit_token, auditp, sizeof(*auditp));
+
+	xpc_dictionary_set_mach_send(xo, XPC_RPORT, request->msgh_remote_port);
+	xpc_dictionary_set_uint64(xo, XPC_SEQID, message.id);
+	*result = xo;
 	return (0);
 }
 
 int
-xpc_pipe_receive(xpc_port_t local, xpc_port_t *remote, xpc_object_t *result,
-    uint64_t *id, struct xpc_credentials *creds)
+xpc_pipe_try_receive(mach_port_t portset, xpc_object_t *requestobj, mach_port_t *rcvport,
+	boolean_t (*demux)(mach_msg_header_t *, mach_msg_header_t *), mach_msg_size_t msgsize __unused,
+	int flags __unused)
 {
-	struct xpc_transport *transport = xpc_get_transport();
-	struct xpc_resource *resources;
-	struct xpc_frame_header *header;
-	void *buffer;
-	size_t nresources;
-	int ret;
+	struct xpc_recv_message message;
+	struct xpc_recv_message rsp_message;
+	mach_msg_header_t *request;
+	kern_return_t kr;
+	mach_msg_header_t *response;
+	mach_msg_trailer_t *tr;
+	int data_size;
+	struct xpc_object *xo;
+	audit_token_t *auditp;
+	xpc_u val;
 
-	buffer = malloc(RECV_BUFFER_SIZE);
+	request = &message.header;
+	response = &rsp_message.header;
+	/* should be size - but what about arbitrary XPC data? */
+	request->msgh_size = MAX_RECV;
+	request->msgh_local_port = portset;
+	kr = mach_msg(request, MACH_RCV_MSG |
+	    MACH_RCV_TRAILER_TYPE(MACH_MSG_TRAILER_FORMAT_0) |
+	    MACH_RCV_TRAILER_ELEMENTS(MACH_RCV_TRAILER_AUDIT),
+	    0, request->msgh_size, request->msgh_local_port,
+	    MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
 
-	ret = transport->xt_recv(local, remote, buffer, RECV_BUFFER_SIZE,
-	    &resources, &nresources, creds);
-	if (ret < 0) {
-		debugf("transport receive function failed: %s", strerror(errno));
-		return (-1);
+	if (kr != 0)
+		LOG("mach_msg_receive returned %d\n", kr);
+	*rcvport = request->msgh_remote_port;
+	if (demux(request, response)) {
+		(void)mach_msg_send(response);
+		/*  can't do anything with the return code
+		* just tell the caller this has been handled
+		*/
+		return (TRUE);
 	}
+	LOG("demux returned false\n");
+	data_size = request->msgh_size;
+	LOG("unpacking data_size=%d", data_size);
+	xo = xpc_unpack(&message.data, data_size);
+	/* is padding for alignment enforced in the kernel?*/
+	tr = (mach_msg_trailer_t *)(((char *)&message) + request->msgh_size);
+	auditp = &((mach_msg_audit_trailer_t *)tr)->msgh_audit;
 
-	if (ret == 0) {
-		debugf("remote side closed connection, port=%s", transport->xt_port_to_string(local));
-		return (ret);
-	}
+	xo->xo_audit_token = malloc(sizeof(*auditp));
+	memcpy(xo->xo_audit_token, auditp, sizeof(*auditp));
 
-	header = (struct xpc_frame_header *)buffer;
-	if (header->length > (ret - sizeof(*header))) {
-		debugf("invalid message length");
-		return (-1);
-	}
-
-	if (header->version != XPC_PROTOCOL_VERSION) {
-		debugf("invalid protocol version")
-		return (-1);
-	}
-
-	*id = header->id;
-
-	debugf("length=%ld", header->length);
-
-	*result = xpc_unpack(buffer + sizeof(*header), header->length);
-
-	if (*result == NULL)
-		return (-1);
-
-	free(buffer);
-	return (ret);
+	xpc_dictionary_set_mach_send(xo, XPC_RPORT, request->msgh_remote_port);
+	xpc_dictionary_set_uint64(xo, XPC_SEQID, message.id);
+	*requestobj = xo;
+	return (0);
 }
 
-kern_return_t xpc_call_wakeup(mach_port_t p, int err)
+int
+xpc_call_wakeup(mach_port_t rport, int retcode)
 {
-	return KERN_SUCCESS;
-}
+	mig_reply_error_t msg;
+	int err;
+	kern_return_t kr;
 
+	msg.Head.msgh_remote_port = rport;
+	msg.RetCode = retcode;
+	kr = mach_msg_send(&msg.Head);
+	if (kr != KERN_SUCCESS)
+		err = (kr == KERN_INVALID_TASK) ? EPIPE : EINVAL;
+	else
+		err = 0;
+
+	return (err);
+}
