@@ -33,6 +33,7 @@
 #include <syslog.h>
 #include <pthread.h>
 #include "xpc/xpc.h"
+#include "xpc/launchd.h"
 #include "xpc_internal.h"
 
 #define RECV_BUFFER_SIZE	65536
@@ -195,7 +196,6 @@ static const char *xpc_errors[] = {
 	"No Such Process"
 };
 
-#if 0
 const char *
 xpc_strerror(int error)
 {
@@ -204,7 +204,6 @@ xpc_strerror(int error)
 		return "BAD ERROR";
 	return (xpc_errors[error]);
 }
-#endif
 
 char *
 xpc_copy_description(xpc_object_t obj)
