@@ -26,7 +26,8 @@
  */
 
 #include <sys/types.h>
-#include <xpc/xpc.h>
+#include <mach/mach.h>
+#include <xpc/launchd.h>
 #include "xpc_internal.h"
 
 xpc_object_t

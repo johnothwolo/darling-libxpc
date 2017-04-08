@@ -22,6 +22,7 @@ add_definitions(-DMACH)
 
 set(xpc_sources
 	mpack.c
+	msgio.c
 	xpc_activity.c
 	xpc_array.c
 	xpc_connection.c
@@ -30,7 +31,7 @@ set(xpc_sources
 	xpc_misc.c
 	xpc_private.c
 	xpc_type.c
-	transports/mach.c
+	stub.c
 	subr_sbuf.c
 	subr_nvlist.c
 	subr_nvpair.c

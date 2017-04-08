@@ -3,9 +3,7 @@
 #ifndef __XPC_H__
 #define __XPC_H__
 
-#ifndef __FreeBSD__
 #include <os/object.h>
-#endif
 #include <dispatch/dispatch.h>
 
 #include <sys/mman.h>
@@ -329,9 +327,7 @@ const char *const _xpc_event_key_name;
 #include <xpc/activity.h>
 #endif // __BLOCKS__
 #undef __XPC_INDIRECT__
-#ifdef __APPLE__
 #include <launch.h>
-#endif
 #endif // __XPC_BUILDING_XPC__ 
 
 #pragma mark XPC Object Protocol
@@ -737,7 +733,6 @@ XPC_EXPORT XPC_MALLOC XPC_RETURNS_RETAINED XPC_WARN_RESULT
 xpc_object_t
 xpc_data_create(const void *bytes, size_t length);
 
-#if 0
 /*!
  * @function xpc_data_create_with_dispatch_data
  *
@@ -761,7 +756,6 @@ __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_5_0)
 XPC_EXPORT XPC_MALLOC XPC_RETURNS_RETAINED XPC_WARN_RESULT XPC_NONNULL1
 xpc_object_t
 xpc_data_create_with_dispatch_data(dispatch_data_t ddata);
-#endif
 
 /*!
  * @function xpc_data_get_length
