@@ -32,6 +32,9 @@ set(xpc_sources
 	xpc_type.c
 	transports/mach.c
 	subr_sbuf.c
+	subr_nvlist.c
+	subr_nvpair.c
+	xpc_pipe.c
 )
 
 set(DYLIB_INSTALL_NAME "/usr/lib/system/libxpc.dylib")

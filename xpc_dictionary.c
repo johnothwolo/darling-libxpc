@@ -384,3 +384,15 @@ xpc_dictionary_apply(xpc_object_t xdict, xpc_dictionary_applier_t applier)
 
 	return (true);
 }
+
+const void *
+xpc_dictionary_get_data(xpc_object_t xdict, const char *key, size_t *length)
+{
+
+}
+
+void
+xpc_dictionary_set_data(xpc_object_t xdict, const char *key, const void *bytes, size_t length)
+{
+
+}

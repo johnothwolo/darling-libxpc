@@ -36,6 +36,9 @@
 #include "xpc_internal.h"
 
 #define RECV_BUFFER_SIZE	65536
+
+#include <xpc/private.h>
+
 #define sbuf_new_auto() sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND)
 
 static void xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf,
@@ -459,4 +462,10 @@ xpc_pipe_receive(xpc_port_t local, xpc_port_t *remote, xpc_object_t *result,
 
 	free(buffer);
 	return (ret);
+}
+
+xpc_object_t
+_od_rpc_call(const char *procname, xpc_object_t payload, xpc_pipe_t (*get_pipe)(bool))
+{
+	return NULL;
 }
