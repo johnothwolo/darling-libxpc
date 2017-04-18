@@ -21,6 +21,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/libc/fbsdcompat)
 add_definitions(-DMACH)
 
 set(xpc_sources
+	init.c
 	mpack.c
 	msgio.c
 	xpc_activity.c
