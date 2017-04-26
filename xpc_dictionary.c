@@ -462,3 +462,20 @@ xpc_dictionary_set_data(xpc_object_t xdict, const char *key, const void *bytes, 
 {
 
 }
+
+xpc_connection_t
+xpc_dictionary_get_remote_connection(xpc_object_t xdict)
+{
+	return NULL;
+}
+
+int
+xpc_dictionary_dup_fd(xpc_object_t xdict, const char *key)
+{
+	return -1;
+}
+
+void
+xpc_dictionary_set_fd(xpc_object_t xdict, const char *key, int fd)
+{
+}

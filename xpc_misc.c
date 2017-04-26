@@ -174,6 +174,14 @@ xpc_release(xpc_object_t obj)
 	xpc_object_destroy(xo);
 }
 
+// The other one is unsafe?
+// This is called by Security and is private
+void
+xpc_release_safe(xpc_object_t obj)
+{
+	xpc_release(obj);
+}
+
 static const char *xpc_errors[] = {
 	"No Error Found",
 	"No Memory",

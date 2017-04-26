@@ -16,6 +16,8 @@ xpc_pipe_t xpc_pipe_create(int name, int arg2);
 
 xpc_object_t _od_rpc_call(const char *procname, xpc_object_t payload, xpc_pipe_t (*get_pipe)(bool));
 
+xpc_object_t xpc_create_with_format(const char * format, ...);
+
 // Completely random. Not sure what the "actual" one is
 #define XPC_PIPE_FLAG_PRIVILEGED 7
 
