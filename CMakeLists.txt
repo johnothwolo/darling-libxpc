@@ -25,7 +25,6 @@ set(xpc_sources
 	todo.c
 	mpack.c
 	msgio.c
-	bsm_wrappers.c
 	xpc_activity.c
 	xpc_array.c
 	xpc_connection.c
