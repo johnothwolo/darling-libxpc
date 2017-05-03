@@ -18,6 +18,8 @@ xpc_object_t _od_rpc_call(const char *procname, xpc_object_t payload, xpc_pipe_t
 
 xpc_object_t xpc_create_with_format(const char * format, ...);
 
+xpc_object_t xpc_create_from_plist(void *data, size_t size);
+
 // Completely random. Not sure what the "actual" one is
 #define XPC_PIPE_FLAG_PRIVILEGED 7
 
