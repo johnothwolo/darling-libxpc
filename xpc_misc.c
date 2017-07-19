@@ -125,7 +125,11 @@ xpc_pack(struct xpc_object *xo, void *buf, size_t *size)
 		return (-1);
 	}
 
-	memcpy(buf, packed, *size);
+	if (buf != NULL)
+		memcpy(buf, packed, *size);
+
+	nvlist_destroy(nv);
+	free(packed);
 	return (0);
 }
 
@@ -137,6 +141,8 @@ xpc_unpack(void *buf, size_t size)
 
 	nv = nvlist_unpack(buf, size);
 	xo = nv2xpc(nv);
+
+	nvlist_destroy(nv);
 	return (xo);
 }
 
@@ -397,12 +403,17 @@ xpc_pipe_routine_reply(xpc_object_t xobj)
 
 	xo = xobj;
 	assert(xo->xo_xpc_type == _XPC_TYPE_DICTIONARY);
-//	size = nvlist_size(xo->xo_nv);
-	msg_size = size + sizeof(mach_msg_header_t) + sizeof(size_t);
+
+	if (xpc_pack(xo, NULL, &size) != 0)
+        return errno;
+
+	msg_size = size + sizeof(struct xpc_message);
+
 	if ((message = malloc(msg_size)) == NULL)
-		return (ENOMEM);
-	//if (xpc2nv(xobj, &message->data, &size) == NULL)
-	//	return (EINVAL);
+		return ENOMEM;
+
+	if (xpc_pack(xo, message->data, &size) != 0)
+        return errno;
 
 	message->header.msgh_size = msg_size;
 	message->header.msgh_remote_port = xpc_dictionary_copy_mach_send(xobj, XPC_RPORT);
@@ -430,11 +441,15 @@ xpc_pipe_send(xpc_object_t xobj, mach_port_t dst, mach_port_t local,
 	xo = xobj;
 	assert(xo->xo_xpc_type == _XPC_TYPE_DICTIONARY);
 
-	if ((message = malloc(msg_size)) == NULL)
-		return (ENOMEM);
+	if (xpc_pack(xo, NULL, &size) != 0)
+		return errno;
 
-	if (xpc_pack(xo, &message->data, &size) != 0)
-		return (EINVAL);
+	msg_size = size + sizeof(struct xpc_message);
+	if ((message = malloc(msg_size)) == NULL)
+		return ENOMEM;
+
+	if (xpc_pack(xo, message->data, &size) != 0)
+		return errno;
 
 	msg_size = ALIGN(size + sizeof(mach_msg_header_t) + sizeof(size_t) + sizeof(uint64_t));
 	message->header.msgh_size = msg_size;
