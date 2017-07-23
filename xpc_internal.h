@@ -32,12 +32,21 @@
 #include "xpc/xpc.h"
 #include <nv.h>
 
+#ifdef XPC_DEBUG
 #define debugf(...) 				\
     do { 					\
     	fprintf(stderr, "%s: ", __func__);	\
     	fprintf(stderr, __VA_ARGS__);		\
     	fprintf(stderr, "\n");			\
     } while(0);
+#else
+#define debugf(...) \
+    do { \
+	char buf[512]; \
+	sprintf(buf, "libxpc: " __VA_ARGS__); \
+	lkm_call(0x1028, buf); \
+    } while(0);
+#endif
 
 #define _XPC_TYPE_INVALID		0
 #define _XPC_TYPE_DICTIONARY		1
@@ -67,6 +76,30 @@ struct xpc_dict_pair;
 TAILQ_HEAD(xpc_dict_head, xpc_dict_pair);
 TAILQ_HEAD(xpc_array_head, xpc_object);
 
+struct xpc_connection {
+	const char *		xc_name;
+	mach_port_t		xc_remote_port;
+	mach_port_t		xc_local_port;
+	xpc_handler_t		xc_handler;
+	dispatch_source_t	xc_recv_source;
+	dispatch_queue_t	xc_send_queue;
+	dispatch_queue_t	xc_recv_queue;
+	dispatch_queue_t	xc_target_queue;
+	int			xc_suspend_count;
+	int			xc_transaction_count;
+	int 			xc_flags;
+	volatile uint64_t	xc_last_id;
+	void *			xc_context;
+	struct xpc_connection * xc_parent;
+	uid_t			xc_remote_euid;
+	gid_t			xc_remote_guid;
+	pid_t			xc_remote_pid;
+	au_asid_t		xc_remote_asid;
+	TAILQ_HEAD(, xpc_pending_call) xc_pending;
+	TAILQ_HEAD(, xpc_connection) xc_peers;
+	TAILQ_ENTRY(xpc_connection) xc_link;
+};
+
 typedef union {
 	struct xpc_dict_head dict;
 	struct xpc_array_head array;
@@ -83,6 +116,7 @@ typedef union {
         xpc_activity_state_t state;
     } activity;
 	mach_port_t port;
+	struct xpc_connection connection;
 } xpc_u;	
 
 
@@ -111,30 +145,6 @@ struct xpc_pending_call {
 	TAILQ_ENTRY(xpc_pending_call) xp_link;
 };
 
-struct xpc_connection {
-	const char *		xc_name;
-	mach_port_t		xc_remote_port;
-	mach_port_t		xc_local_port;
-	xpc_handler_t		xc_handler;
-	dispatch_source_t	xc_recv_source;
-	dispatch_queue_t	xc_send_queue;
-	dispatch_queue_t	xc_recv_queue;
-	dispatch_queue_t	xc_target_queue;
-	int			xc_suspend_count;
-	int			xc_transaction_count;
-	int 			xc_flags;
-	volatile uint64_t	xc_last_id;
-	void *			xc_context;
-	struct xpc_connection * xc_parent;
-	uid_t			xc_remote_euid;
-	gid_t			xc_remote_guid;
-	pid_t			xc_remote_pid;
-	au_asid_t		xc_remote_asid;
-	TAILQ_HEAD(, xpc_pending_call) xc_pending;
-	TAILQ_HEAD(, xpc_connection) xc_peers;
-	TAILQ_ENTRY(xpc_connection) xc_link;
-};
-
 struct xpc_service {
 	mach_port_t		xs_remote_port;
 	TAILQ_HEAD(, xpc_connection) xs_connections;
@@ -153,6 +163,7 @@ struct xpc_service {
 #define xo_array xo_u.array
 #define xo_dict xo_u.dict
 #define xo_activity xo_u.activity
+#define xo_connection xo_u.connection
 
 __private_extern__ struct xpc_object *_xpc_prim_create(int type, xpc_u value,
     size_t size);

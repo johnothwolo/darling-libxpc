@@ -155,6 +155,9 @@ xpc_object_destroy(struct xpc_object *xo)
 	if (xo->xo_xpc_type == _XPC_TYPE_ARRAY)
 		xpc_array_destroy(xo);
 
+	if (xo->xo_xpc_type == _XPC_TYPE_CONNECTION)
+		xpc_connection_destroy(xo);
+
 	free(xo);
 }
 
@@ -174,7 +177,7 @@ xpc_release(xpc_object_t obj)
 	struct xpc_object *xo;
 
 	xo = obj;
-	if (OSAtomicDecrement32(&xo->xo_refcnt) > 1)
+	if (OSAtomicDecrement32(&xo->xo_refcnt) > 0)
 		return;
 
 	xpc_object_destroy(xo);
@@ -439,8 +442,12 @@ xpc_pipe_send(xpc_object_t xobj, mach_port_t dst, mach_port_t local,
 	int err;
 
 	xo = xobj;
+	debugf("obj type is %d", xo->xo_xpc_type);
+	if (xo->xo_xpc_type != _XPC_TYPE_DICTIONARY)
+		debugf("obj type is %s", _xpc_get_type_name(xobj));
 	assert(xo->xo_xpc_type == _XPC_TYPE_DICTIONARY);
 
+	debugf("packing message");
 	if (xpc_pack(xo, NULL, &size) != 0)
 		return errno;
 
@@ -451,6 +458,7 @@ xpc_pipe_send(xpc_object_t xobj, mach_port_t dst, mach_port_t local,
 	if (xpc_pack(xo, message->data, &size) != 0)
 		return errno;
 
+	debugf("sending message");
 	msg_size = ALIGN(size + sizeof(mach_msg_header_t) + sizeof(size_t) + sizeof(uint64_t));
 	message->header.msgh_size = msg_size;
 	message->header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND,
@@ -514,6 +522,8 @@ xpc_pipe_receive(mach_port_t local, mach_port_t *remote, xpc_object_t *result,
 
 	xpc_dictionary_set_mach_send(xo, XPC_RPORT, request->msgh_remote_port);
 	xpc_dictionary_set_uint64(xo, XPC_SEQID, message.id);
+	xo->xo_flags |= _XPC_FROM_WIRE;
+
 	*result = xo;
 	return (0);
 }
@@ -568,6 +578,7 @@ xpc_pipe_try_receive(mach_port_t portset, xpc_object_t *requestobj, mach_port_t 
 
 	xpc_dictionary_set_mach_send(xo, XPC_RPORT, request->msgh_remote_port);
 	xpc_dictionary_set_uint64(xo, XPC_SEQID, message.id);
+	xo->xo_flags |= _XPC_FROM_WIRE;
 	*requestobj = xo;
 	return (0);
 }

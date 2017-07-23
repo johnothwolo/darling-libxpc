@@ -246,10 +246,18 @@ xpc_dictionary_create_reply(xpc_object_t original)
 	nvlist_t *nv;
 	xpc_u val;
 
+	if (xpc_get_type(original) != XPC_TYPE_DICTIONARY)
+		return NULL;
+
 	xo_orig = original;
 	if ((xo_orig->xo_flags & _XPC_FROM_WIRE) == 0)
+	{
+		debugf("xpc_dictionary_create_reply: not from wire!");
 		return (NULL);
+	}
+	xo_orig->xo_flags &= ~_XPC_FROM_WIRE;
 
+	// TODO: Apple puts a reference to original into retval
 	return xpc_dictionary_create(NULL, NULL, 0);
 }
 

@@ -416,6 +416,7 @@ xpc_equal(xpc_object_t x1, xpc_object_t x2)
 
 	xo1 = x1;
 	xo2 = x2;
+	return xo1 == xo2;
 }
 
 static size_t
@@ -468,6 +469,8 @@ xpc_hash(xpc_object_t obj)
 			return ((bool)true);
 		});
 		return (hash);
+	default:
+		return 0;
 	}
 }
 
