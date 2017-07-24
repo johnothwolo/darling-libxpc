@@ -559,7 +559,15 @@ xpc_pipe_try_receive(mach_port_t portset, xpc_object_t *requestobj, mach_port_t 
 		LOG("mach_msg_receive returned %d\n", kr);
 	*rcvport = request->msgh_remote_port;
 	if (demux(request, response)) {
-		(void)mach_msg_send(response);
+		mig_reply_error_t* migError = (mig_reply_error_t*) response;
+
+		if (!(migError->Head.msgh_bits & MACH_MSGH_BITS_COMPLEX)) {
+			if (migError->RetCode == MIG_NO_REPLY)
+				migError->Head.msgh_remote_port = MACH_PORT_NULL;
+		}
+
+		if (response->msgh_remote_port != MACH_PORT_NULL)
+			(void)mach_msg_send(response);
 		/*  can't do anything with the return code
 		* just tell the caller this has been handled
 		*/
