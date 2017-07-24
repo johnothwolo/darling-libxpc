@@ -69,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include "nv_impl.h"
 #include "nvlist_impl.h"
 #include "nvpair_impl.h"
+#include "xpc_internal.h"
 
 #ifndef	HAVE_PJDLOG
 #ifdef _KERNEL
