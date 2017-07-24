@@ -131,3 +131,7 @@ xpc_activity_unregister(const char *identifier)
 {
 
 }
+
+void xpc_track_activity(void)
+{
+}
