@@ -487,3 +487,7 @@ void
 xpc_dictionary_set_fd(xpc_object_t xdict, const char *key, int fd)
 {
 }
+
+void
+xpc_dictionary_set_double(xpc_object_t xdict, const char *key, double value) {
+}
