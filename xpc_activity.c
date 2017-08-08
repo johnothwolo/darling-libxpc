@@ -46,6 +46,13 @@ const char *XPC_ACTIVITY_REQUIRE_SCREEN_SLEEP = "RequireScreenSleep";
 const char *XPC_ACTIVITY_REQUIRE_BATTERY_LEVEL = "RequireBatteryLevel";
 const char *XPC_ACTIVITY_REQUIRE_HDD_SPINNING = "RequireHDDSpinning";
 
+const char *XPC_ACTIVITY_REQUIRE_NETWORK_CONNECTIVITY = "RequireNetworkConnectivity";
+const char *XPC_ACTIVITY_REQUIRE_INEXPENSIVE_NETWORK_CONNECTIVITY = "RequireInexpensiveNetworkConnectivity";
+const char *XPC_ACTIVITY_NETWORK_TRANSFER_DIRECTION = "NetworkTransferDirection";
+
+const char *XPC_ACTIVITY_NETWORK_TRANSFER_DIRECTION_DOWNLOAD = "Download";
+const char *XPC_ACTIVITY_NETWORK_TRANSFER_DIRECTION_UPLOAD = "Upload";
+
 static const struct xpc_object _xpc_activity_check_in = {
 	.xo_xpc_type = _XPC_TYPE_STRING,
 	.xo_size = 10,		/* strlen("<CHECK-IN>") */
