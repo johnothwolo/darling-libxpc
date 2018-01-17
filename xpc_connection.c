@@ -525,3 +525,6 @@ xpc_connection_recv_message(void *context)
 		}
 	}
 }
+
+void xpc_connection_get_audit_token(xpc_connection_t connection, audit_token_t* auditToken) {
+}
