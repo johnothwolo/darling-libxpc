@@ -399,13 +399,13 @@ xpc_main(xpc_connection_handler_t handler)
 void
 xpc_transaction_begin(void)
 {
-
+	vproc_transaction_begin(NULL);
 }
 
 void
 xpc_transaction_end(void)
 {
-
+	vproc_transaction_end(NULL, NULL);
 }
 
 static void

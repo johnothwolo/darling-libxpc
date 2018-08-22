@@ -460,7 +460,7 @@ xpc_pipe_send(xpc_object_t xobj, mach_port_t dst, mach_port_t local,
 
 	debugf("sending message");
 	msg_size = ALIGN(size + sizeof(mach_msg_header_t) + sizeof(size_t) + sizeof(uint64_t));
-	message->header.msgh_size = msg_size;
+	message->header.msgh_size = (mach_msg_size_t)msg_size;
 	message->header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND,
 	    MACH_MSG_TYPE_MAKE_SEND);
 	message->header.msgh_remote_port = dst;
@@ -489,7 +489,6 @@ xpc_pipe_receive(mach_port_t local, mach_port_t *remote, xpc_object_t *result,
 	struct xpc_recv_message message;
 	mach_msg_header_t *request;
 	kern_return_t kr;
-	mig_reply_error_t response;
 	mach_msg_trailer_t *tr;
 	int data_size;
 	struct xpc_object *xo;
@@ -510,7 +509,7 @@ xpc_pipe_receive(mach_port_t local, mach_port_t *remote, xpc_object_t *result,
 		LOG("mach_msg_receive returned %d\n", kr);
 	*remote = request->msgh_remote_port;
 	*id = message.id;
-	data_size = message.size;
+	data_size = (int)message.size;
 	LOG("unpacking data_size=%d", data_size);
 	xo = xpc_unpack(&message.data, data_size);
 
@@ -542,7 +541,6 @@ xpc_pipe_try_receive(mach_port_t portset, xpc_object_t *requestobj, mach_port_t 
 	int data_size;
 	struct xpc_object *xo;
 	audit_token_t *auditp;
-	xpc_u val;
 
 	request = &message.header;
 	response = &rsp_message.header;
