@@ -493,7 +493,6 @@ xpc_pipe_receive(mach_port_t local, mach_port_t *remote, xpc_object_t *result,
 	int data_size;
 	struct xpc_object *xo;
 	audit_token_t *auditp;
-	xpc_u val;
 
 	request = &message.header;
 	/* should be size - but what about arbitrary XPC data? */
