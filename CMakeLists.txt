@@ -38,6 +38,7 @@ set(xpc_sources
 	subr_nvlist.c
 	subr_nvpair.c
 	xpc_pipe.c
+	reboot3.c
 )
 
 set(DYLIB_INSTALL_NAME "/usr/lib/system/libxpc.dylib")
