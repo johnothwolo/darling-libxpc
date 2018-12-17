@@ -20,6 +20,11 @@ xpc_object_t xpc_create_with_format(const char * format, ...);
 
 xpc_object_t xpc_create_from_plist(void *data, size_t size);
 
+void xpc_dictionary_get_audit_token(xpc_object_t, audit_token_t *);
+int xpc_pipe_routine_reply(xpc_object_t);
+int xpc_pipe_routine(xpc_object_t pipe, void *payload,xpc_object_t *reply);
+
+
 // Completely random. Not sure what the "actual" one is
 #define XPC_PIPE_FLAG_PRIVILEGED 7
 

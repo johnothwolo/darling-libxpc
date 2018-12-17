@@ -35,7 +35,7 @@
 #include <syslog.h>
 #include <stdarg.h>
 #include <uuid/uuid.h>
-
+#include <stdio.h>
 #include "xpc_internal.h"
 
 #define RECV_BUFFER_SIZE	65536
@@ -609,5 +609,19 @@ xpc_call_wakeup(mach_port_t rport, int retcode)
 xpc_object_t
 _od_rpc_call(const char *procname, xpc_object_t payload, xpc_pipe_t (*get_pipe)(bool))
 {
+	printf("STUB _od_rpc_call\n");
 	return NULL;
+}
+
+int
+xpc_pipe_routine(xpc_object_t pipe, void *payload,xpc_object_t *reply)
+{
+	printf("STUB xpc_pipe_routine\n");
+	return 0;
+}
+
+void
+xpc_dictionary_set_uuid(xpc_object_t xdict, const char *key, const uuid_t uuid)
+{
+	printf("STUB xpc_dictionary_set_uuid\n");
 }
