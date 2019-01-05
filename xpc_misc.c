@@ -52,6 +52,8 @@
     sizeof(uint64_t) - 			\
     sizeof(size_t)
 
+const char *const _xpc_event_key_name = "XPCEventName";
+
 struct xpc_message {
 	mach_msg_header_t header;
 	size_t size;
