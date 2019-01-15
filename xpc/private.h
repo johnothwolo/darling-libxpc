@@ -1,5 +1,7 @@
 #ifndef XPC_PRIVATE_H_
 #define XPC_PRIVATE_H_
+
+#include <uuid/uuid.h>
 #include <xpc/xpc.h>
 
 #ifdef __cplusplus
@@ -24,6 +26,9 @@ void xpc_dictionary_get_audit_token(xpc_object_t, audit_token_t *);
 int xpc_pipe_routine_reply(xpc_object_t);
 int xpc_pipe_routine(xpc_object_t pipe, void *payload,xpc_object_t *reply);
 
+void xpc_connection_set_target_uid(xpc_connection_t connection, uid_t uid);
+void xpc_connection_set_instance(xpc_connection_t connection, uuid_t uid);
+void xpc_dictionary_set_mach_send(xpc_object_t object, char *type, int port);
 
 // Completely random. Not sure what the "actual" one is
 #define XPC_PIPE_FLAG_PRIVILEGED 7
