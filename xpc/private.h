@@ -28,7 +28,7 @@ int xpc_pipe_routine(xpc_object_t pipe, void *payload,xpc_object_t *reply);
 
 void xpc_connection_set_target_uid(xpc_connection_t connection, uid_t uid);
 void xpc_connection_set_instance(xpc_connection_t connection, uuid_t uid);
-void xpc_dictionary_set_mach_send(xpc_object_t object, char *type, int port);
+void xpc_dictionary_set_mach_send(xpc_object_t object, const char* key, mach_port_t port);
 
 // Completely random. Not sure what the "actual" one is
 #define XPC_PIPE_FLAG_PRIVILEGED 7
