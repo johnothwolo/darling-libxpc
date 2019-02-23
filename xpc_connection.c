@@ -52,7 +52,7 @@ xpc_connection_create(const char *name, dispatch_queue_t targetq)
 	struct xpc_connection *conn;
 	xpc_connection_t rv;
 
-	xpc_u val;
+	xpc_u val = { 0 };
 	rv = _xpc_prim_create(_XPC_TYPE_CONNECTION, val, 0);
 	if (rv == NULL)
 		return NULL;
@@ -185,7 +185,7 @@ xpc_connection_set_target_queue(xpc_connection_t xconn,
 
 	debugf("xpc_connection_set_target_queue(): connection=%p", xconn);
 	conn = conn_extract(xconn);
-	conn->xc_target_queue = targetq;	
+	conn->xc_target_queue = targetq;
 }
 
 void
@@ -235,7 +235,6 @@ xpc_connection_resume(xpc_connection_t xconn)
 	dispatch_async(conn->xc_recv_queue, ^{
 		debugf("Recv queue works! #2");
 	});
-	
 
 }
 
@@ -466,9 +465,11 @@ xpc_connection_recv_message(void *context)
 	if (conn->xc_flags & XPC_CONNECTION_MACH_SERVICE_LISTENER) {
 		TAILQ_FOREACH(peer, &conn->xc_peers, xc_link) {
 			if (remote == peer->xc_remote_port) {
-				dispatch_async(peer->xc_target_queue, ^{
-					peer->xc_handler(result);
-				});
+				if (peer->xc_handler) {
+					dispatch_async(peer->xc_target_queue, ^{
+						peer->xc_handler(result);
+					});
+				}
 				return;
 			}
 		}
@@ -485,18 +486,22 @@ xpc_connection_recv_message(void *context)
 
 		TAILQ_INSERT_TAIL(&conn->xc_peers, peer, xc_link);
 
-		debugf("Async run conn handler");
-		dispatch_async(conn->xc_target_queue, ^{
-			debugf("Sync run conn handler");
-			conn->xc_handler(peerx);
-			debugf("Sync conn handler done");
-		});
+		if (conn->xc_handler) {
+			debugf("Async run conn handler");
+			dispatch_async(conn->xc_target_queue, ^{
+				debugf("Sync run conn handler");
+				conn->xc_handler(peerx);
+				debugf("Sync conn handler done");
+			});
+		}
 
-		dispatch_async(peer->xc_target_queue, ^{
-			debugf("Sync result handler");
-			peer->xc_handler(result);
-			debugf("Sync result handler done");
-		});
+		if (peer->xc_handler) {
+			dispatch_async(peer->xc_target_queue, ^{
+				debugf("Sync result handler");
+				peer->xc_handler(result);
+				debugf("Sync result handler done");
+			});
+		}
 
 	} else {
 		xpc_connection_set_credentials(conn,
@@ -506,13 +511,15 @@ xpc_connection_recv_message(void *context)
 		TAILQ_FOREACH(call, &conn->xc_pending, xp_link) {
 			if (call->xp_id == id) {
 				debugf("Found matching ID, async run handler on queue %p", conn->xc_target_queue);
-				dispatch_async(conn->xc_target_queue, ^{
-					debugf("pass to handler");
-					call->xp_handler(result);
-					TAILQ_REMOVE(&conn->xc_pending, call,
-					    xp_link);
-					free(call);
-				});
+				if (call->xp_handler) {
+					dispatch_async(conn->xc_target_queue, ^{
+						debugf("pass to handler");
+						call->xp_handler(result);
+						TAILQ_REMOVE(&conn->xc_pending, call,
+						    xp_link);
+						free(call);
+					});
+				}
 				return;
 			}
 		}
