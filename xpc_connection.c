@@ -535,3 +535,11 @@ xpc_connection_recv_message(void *context)
 
 void xpc_connection_get_audit_token(xpc_connection_t connection, audit_token_t* auditToken) {
 }
+
+void xpc_connection_set_legacy(xpc_connection_t connection) {
+	puts("STUB: xpc_connection_set_legacy called");
+}
+
+void xpc_connection_set_privileged(xpc_connection_t connection) {
+	puts("STUB: xpc_connection_set_privileged");
+}
