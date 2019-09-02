@@ -709,6 +709,12 @@ void
 xpc_connection_set_finalizer_f(xpc_connection_t connection,
 	xpc_finalizer_t finalizer);
 
+void
+xpc_connection_set_legacy(xpc_connection_t connection);
+
+void
+xpc_connection_set_privileged(xpc_connection_t connection);
+
 __END_DECLS
 
 #endif // __XPC_CONNECTION_H__ 
