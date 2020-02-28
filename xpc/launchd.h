@@ -1,6 +1,7 @@
 #ifndef XPC_LAUNCHD_H_
 #define XPC_LAUNCHD_H_
 #include <xpc/xpc.h>
+#include <xpc/launchd_defs.h>
 
 #define EXNOERROR	0
 #define EXNOMEM		1
