@@ -273,7 +273,9 @@ xpc_data_create(const void *bytes, size_t length)
 {
 	xpc_u val;
 
-	val.ptr = (uintptr_t)bytes;
+	void* copy = malloc(length);
+	memcpy(copy, bytes, length);
+	val.ptr = copy;
 	return _xpc_prim_create(_XPC_TYPE_DATA, val, length);
 }
 
@@ -340,8 +342,12 @@ xpc_string_create(const char *string)
 {
 	xpc_u val;
 
-	val.str = string;
-	return _xpc_prim_create(_XPC_TYPE_STRING, val, strlen(string));
+	size_t len = strlen(string);
+	char* str = malloc(len + 1);
+	strncpy(str, string, len);
+	str[len] = '\0';
+	val.str = str;
+	return _xpc_prim_create(_XPC_TYPE_STRING, val, len);
 }
 
 xpc_object_t

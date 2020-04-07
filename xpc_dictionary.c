@@ -337,7 +337,11 @@ xpc_dictionary_set_value(xpc_object_t xdict, const char *key, xpc_object_t value
 
 	xo->xo_size++;
 	pair = malloc(sizeof(struct xpc_dict_pair));
-	pair->key = key;
+	size_t len = strlen(key);
+	char* str = malloc(len + 1);
+	strncpy(str, key, len);
+	str[len] = '\0';
+	pair->key = str;
 	pair->value = value;
 	TAILQ_INSERT_TAIL(&xo->xo_dict, pair, xo_link);
 	xpc_retain(value);
