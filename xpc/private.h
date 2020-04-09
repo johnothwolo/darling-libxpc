@@ -20,6 +20,8 @@ xpc_object_t _od_rpc_call(const char *procname, xpc_object_t payload, xpc_pipe_t
 
 xpc_object_t xpc_create_with_format(const char * format, ...);
 
+xpc_object_t xpc_create_reply_with_format(xpc_object_t original, const char * format, ...);
+
 xpc_object_t xpc_create_from_plist(void *data, size_t size);
 
 void xpc_dictionary_get_audit_token(xpc_object_t, audit_token_t *);

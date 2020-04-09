@@ -450,6 +450,11 @@ xpc_dictionary_get_string(xpc_object_t xdict, const char *key)
 	return (xpc_string_get_string_ptr(xo));
 }
 
+double xpc_dictionary_get_double(xpc_object_t xdict, const char *key) {
+	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
+	return xpc_double_get_value(xo);
+};
+
 bool
 xpc_dictionary_apply(xpc_object_t xdict, xpc_dictionary_applier_t applier)
 {

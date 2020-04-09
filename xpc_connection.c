@@ -137,6 +137,7 @@ xpc_connection_create_mach_service(const char *name, dispatch_queue_t targetq,
 		    &conn->xc_local_port);
 		if (kr != KERN_SUCCESS) {
 			errno = EBUSY;
+			xpc_connection_resume(rv);
 			xpc_release(rv);
 			return (NULL);
 		}
@@ -153,6 +154,7 @@ xpc_connection_create_mach_service(const char *name, dispatch_queue_t targetq,
 	kr = bootstrap_look_up(bootstrap_port, name, &conn->xc_remote_port);
 	if (kr != KERN_SUCCESS) {
 		errno = ENOENT;
+		xpc_connection_resume(rv);
 		xpc_release(rv);
 		return (NULL);
 	}
