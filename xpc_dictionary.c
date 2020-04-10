@@ -30,6 +30,7 @@
 #include <xpc/launchd.h>
 #include "xpc_internal.h"
 #include <assert.h>
+#include <math.h>
 
 #define NVLIST_XPC_TYPE		"__XPC_TYPE"
 
@@ -414,45 +415,39 @@ xpc_dictionary_set_string(xpc_object_t xdict, const char *key, const char *value
 	xpc_dictionary_set_value(xdict, key, xotmp);
 }
 
-bool
-xpc_dictionary_get_bool(xpc_object_t xdict, const char *key)
-{
-	xpc_object_t xo;
-
-	xo = xpc_dictionary_get_value(xdict, key);
-	return (xpc_bool_get_value(xo));
-}
-
-int64_t
-xpc_dictionary_get_int64(xpc_object_t xdict, const char *key)
-{
-	xpc_object_t xo;
-
-	xo = xpc_dictionary_get_value(xdict, key);
-	return (xpc_int64_get_value(xo));
-}
-
-uint64_t
-xpc_dictionary_get_uint64(xpc_object_t xdict, const char *key)
-{
-	xpc_object_t xo;
-
-	xo = xpc_dictionary_get_value(xdict, key);
-	return (xpc_uint64_get_value(xo));
-}
-
-const char *
-xpc_dictionary_get_string(xpc_object_t xdict, const char *key)
-{
-	xpc_object_t xo;
-
-	xo = xpc_dictionary_get_value(xdict, key);
-	return (xpc_string_get_string_ptr(xo));
-}
-
-double xpc_dictionary_get_double(xpc_object_t xdict, const char *key) {
+bool xpc_dictionary_get_bool(xpc_object_t xdict, const char* key) {
 	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
-	return xpc_double_get_value(xo);
+	if (xo)
+		return xpc_bool_get_value(xo);
+	return false;
+};
+
+int64_t xpc_dictionary_get_int64(xpc_object_t xdict, const char* key) {
+	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
+	if (xo)
+		return xpc_int64_get_value(xo);
+	return 0;
+};
+
+uint64_t xpc_dictionary_get_uint64(xpc_object_t xdict, const char* key) {
+	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
+	if (xo)
+		return xpc_uint64_get_value(xo);
+	return 0;
+};
+
+const char* xpc_dictionary_get_string(xpc_object_t xdict, const char* key) {
+	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
+	if (xo)
+		return xpc_string_get_string_ptr(xo);
+	return NULL;
+}
+
+double xpc_dictionary_get_double(xpc_object_t xdict, const char* key) {
+	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
+	if (xo)
+		return xpc_double_get_value(xo);
+	return NAN;
 };
 
 bool
