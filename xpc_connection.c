@@ -494,17 +494,16 @@ xpc_connection_recv_message(void *context)
 				debugf("Sync run conn handler");
 				conn->xc_handler(peerx);
 				debugf("Sync conn handler done");
+
+				if (peer->xc_handler) {
+					dispatch_async(peer->xc_target_queue, ^{
+						debugf("Sync result handler");
+						peer->xc_handler(result);
+						debugf("Sync result handler done");
+					});
+				}
 			});
 		}
-
-		if (peer->xc_handler) {
-			dispatch_async(peer->xc_target_queue, ^{
-				debugf("Sync result handler");
-				peer->xc_handler(result);
-				debugf("Sync result handler done");
-			});
-		}
-
 	} else {
 		xpc_connection_set_credentials(conn,
 		    ((struct xpc_object *)result)->xo_audit_token);

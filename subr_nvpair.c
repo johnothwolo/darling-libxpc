@@ -690,7 +690,7 @@ nvpair_unpack_binary(bool isbe __unused, nvpair_t *nvp,
 
 	PJDLOG_ASSERT(nvp->nvp_type == NV_TYPE_BINARY);
 
-	if (*leftp < nvp->nvp_datasize || nvp->nvp_datasize == 0) {
+	if (*leftp < nvp->nvp_datasize) {
 		RESTORE_ERRNO(EINVAL);
 		return (NULL);
 	}
@@ -1091,7 +1091,7 @@ nvpair_createv_binary(const void *value, size_t size, const char *namefmt,
 	nvpair_t *nvp;
 	void *data;
 
-	if (value == NULL || size == 0) {
+	if (value == NULL) {
 		RESTORE_ERRNO(EINVAL);
 		return (NULL);
 	}
@@ -1320,7 +1320,7 @@ nvpair_movev_binary(void *value, size_t size, const char *namefmt,
 	nvpair_t *nvp;
 	int serrno;
 
-	if (value == NULL || size == 0) {
+	if (value == NULL) {
 		RESTORE_ERRNO(EINVAL);
 		return (NULL);
 	}
