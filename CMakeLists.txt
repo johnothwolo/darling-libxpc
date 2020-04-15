@@ -34,6 +34,7 @@ set(xpc_sources
 	xpc_misc.c
 	xpc_private.c
 	xpc_type.c
+	subr_sbuf.c
 	xpc_pipe.c
 	reboot3.c
 )
