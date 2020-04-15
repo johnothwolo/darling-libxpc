@@ -85,6 +85,7 @@ xpc_array_append_value(xpc_object_t xarray, xpc_object_t value)
 
 	TAILQ_INSERT_TAIL(arr, (struct xpc_object *)value, xo_link);
 	xpc_retain(value);
+	++xo->xo_size;
 }
 
 
