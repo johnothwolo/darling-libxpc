@@ -37,7 +37,7 @@
 #include <uuid/uuid.h>
 #include <stdio.h>
 #include "xpc_internal.h"
-#include "endian_compat.h"
+#include <libkern/OSByteOrder.h>
 
 #define RECV_BUFFER_SIZE	65536
 
@@ -169,28 +169,37 @@ xpc_array_destroy(struct xpc_object *dict)
 
 #define XPC_PACK_TYPE_MASK 0x1f
 #define XPC_PACK_TYPE_BITS 5
+#define XPC_PACK_INT_INITIAL_BITS (8 - (XPC_PACK_TYPE_BITS + 1))
+#define XPC_PACK_INT_EXTRA_BYTES(x) (((x - (8 - XPC_PACK_TYPE_BITS)) + 7) / 8)
 
 XPC_INLINE bool xpc_pack_is_variable_length(uint8_t xo_xpc_type) {
 	return xo_xpc_type == _XPC_TYPE_DICTIONARY || xo_xpc_type == _XPC_TYPE_ARRAY || xo_xpc_type == _XPC_TYPE_DATA;
 };
 
+XPC_INLINE uint8_t xpc_pack_generate_mask(uint8_t bits, bool least_significant) {
+	static const uint8_t lookup_table[] = {
+		0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff,
+	};
+	return lookup_table[bits] >> (least_significant ? (8 - bits) : 0);
+};
+
 // buf must be little-endian
 XPC_INLINE size_t xpc_pack_encode_int_bits(const uint8_t* buf, size_t buf_size, bool raw) {
-	while (*buf == 0 && buf_size > 0) {
+	while (buf_size > 0 && buf[buf_size - 1] == 0)
 		--buf_size;
-		++buf;
-	}
 
 	if (buf_size == 0)
 		return 0;
 
+	uint8_t msb = buf[buf_size - 1];
 	size_t leading_bit_count = 8;
-	for (uint8_t i = 8; i > 0; --i)
-		if (*buf & (1 << (i - 1)) == 0)
+	for (uint8_t i = 8; i > 0; --i) {
+		if ((msb & (1 << (i - 1))) == 0) {
 			--leading_bit_count;
-
-	if (buf_size == 1 && leading_bit_count < XPC_PACK_TYPE_BITS)
-		return leading_bit_count + (raw ? 0 : 1);
+		} else {
+			break;
+		}
+	}
 
 	// number of bits needed for actual number
 	size_t raw_bits = ((buf_size - 1) * 8) + leading_bit_count;
@@ -198,7 +207,10 @@ XPC_INLINE size_t xpc_pack_encode_int_bits(const uint8_t* buf, size_t buf_size, 
 	if (raw)
 		return raw_bits;
 
-	return raw_bits + ((raw_bits - (XPC_PACK_TYPE_BITS - 1)) / 7) + 1;
+	if (raw_bits <= XPC_PACK_INT_INITIAL_BITS)
+		return XPC_PACK_INT_INITIAL_BITS + 1;
+
+	return raw_bits + ((raw_bits - XPC_PACK_INT_INITIAL_BITS) / 7) + 1;
 };
 
 // buf must be little-endian
@@ -206,28 +218,28 @@ XPC_INLINE void xpc_pack_encode_int(uint8_t* out, const uint8_t* buf, size_t buf
 	if (buf_size == 0)
 		return;
 
-	uint8_t initial_mask = (0xff << (XPC_PACK_TYPE_BITS + 1)) >> (XPC_PACK_TYPE_BITS + 1);
+	uint8_t initial_mask = xpc_pack_generate_mask(8 - XPC_PACK_TYPE_BITS - 1, true);
 	out[0] = ((buf[0] & initial_mask) << XPC_PACK_TYPE_BITS) | out[0] & XPC_PACK_TYPE_MASK;
 
-	if (buf[0] & ~(uint8_t)initial_mask == 0)
+	if ((buf[0] & ~initial_mask) == 0)
 		return;
 
 	out[0] |= 1 << 7;
 
-	size_t raw_bits = xpc_pack_encode_int_bits(buf, buf_size, true) - (XPC_PACK_TYPE_BITS - 1);
-	size_t leftover_bits = 8 - (XPC_PACK_TYPE_BITS - 1);
+	size_t raw_bits = xpc_pack_encode_int_bits(buf, buf_size, true) - (8 - (XPC_PACK_TYPE_BITS + 1));
+	size_t leftover_bits = XPC_PACK_TYPE_BITS + 1;
 	size_t buf_idx = 0;
 	size_t out_idx = 1;
 
-	for (; raw_bits > 7; raw_bits -= 7, ++out_idx) {
+	for (; raw_bits >= 7; raw_bits -= 7, ++out_idx) {
 		if (leftover_bits == 8) {
 			// 0x7f == 0b01111111
 			out[out_idx] = (1 << 7) | buf[buf_idx] & 0x7f;
 			leftover_bits = 1;
 		} else {
-			uint8_t prev_byte_mask = (0xff >> (8 - leftover_bits)) << (8 - leftover_bits);
+			uint8_t prev_byte_mask = xpc_pack_generate_mask(leftover_bits, false);
 			uint8_t bits_left_in_encoding_segment = 7 - leftover_bits;
-			uint8_t next_byte_mask = (0xff << (8 - bits_left_in_encoding_segment)) >> (8 - bits_left_in_encoding_segment);
+			uint8_t next_byte_mask = xpc_pack_generate_mask(bits_left_in_encoding_segment, true);
 			out[out_idx] = (1 << 7) | ((buf[buf_idx] & prev_byte_mask) >> (8 - leftover_bits)) | ((buf[buf_idx + 1] & next_byte_mask) << leftover_bits);
 			leftover_bits = 8 - bits_left_in_encoding_segment;
 			++buf_idx;
@@ -239,33 +251,37 @@ XPC_INLINE void xpc_pack_encode_int(uint8_t* out, const uint8_t* buf, size_t buf
 		// 0x7f == 0b01111111
 		out[out_idx - 1] &= 0x7f;
 	} else {
-		uint8_t prev_byte_mask = (0xff >> (8 - leftover_bits)) << (8 - leftover_bits);
+		uint8_t prev_byte_mask = xpc_pack_generate_mask(leftover_bits, false);
 		out[out_idx] = (buf[buf_idx] & prev_byte_mask) >> (8 - leftover_bits);
+		if (leftover_bits < raw_bits) {
+			uint8_t bits_left_in_encoding_segment = 7 - leftover_bits;
+			uint8_t next_byte_mask = xpc_pack_generate_mask(bits_left_in_encoding_segment, true);
+			out[out_idx] |= (buf[buf_idx + 1] & next_byte_mask) << leftover_bits;
+		}
 	}
 };
 
 XPC_INLINE size_t xpc_unpack_decode_int(uint8_t* out, const uint8_t* buf) {
-	// 0x7f == 0b01111111
-	uint8_t initial_mask = (0x7f >> XPC_PACK_TYPE_BITS) << XPC_PACK_TYPE_BITS;
+	// `>> 1` because we don't want to include the most significant bit
+	uint8_t initial_mask = xpc_pack_generate_mask(8 - XPC_PACK_TYPE_BITS - 1, false) >> 1;
 	out[0] = (buf[0] & initial_mask) >> XPC_PACK_TYPE_BITS;
 
-	if (buf[0] & (1 << 7) == 0)
+	if ((buf[0] & (1 << 7)) == 0)
 		return 1;
 
-	size_t leftover_bits = 8 - (XPC_PACK_TYPE_BITS - 1);
+	size_t leftover_bits = XPC_PACK_TYPE_BITS + 1;
 	size_t out_idx = 0;
 	size_t buf_idx = 1;
 
-	while (buf[buf_idx] & (1 << 7) != 0) {
+	while ((buf[buf_idx] & (1 << 7)) != 0) {
 		if (leftover_bits == 8) {
 			// 0x7f == 0b01111111
 			out[out_idx] = buf[buf_idx] & 0x7f;
 			leftover_bits = 1;
 		} else {
-			uint8_t prev_byte_mask = (0xff << (8 - leftover_bits)) >> (8 - leftover_bits);
+			uint8_t prev_byte_mask = xpc_pack_generate_mask(leftover_bits, true);
 			uint8_t bits_left_in_encoding_segment = 7 - leftover_bits;
-			// 0x7f == 0b01111111
-			uint8_t next_byte_mask = (0x7f >> (8 - bits_left_in_encoding_segment)) << (8 - bits_left_in_encoding_segment);
+			uint8_t next_byte_mask = xpc_pack_generate_mask(bits_left_in_encoding_segment, false) >> 1;
 			out[out_idx] |= (buf[buf_idx] & prev_byte_mask) << (8 - leftover_bits);
 			out[out_idx + 1] = (buf[buf_idx] & next_byte_mask) >> leftover_bits;
 			leftover_bits = 8 - bits_left_in_encoding_segment;
@@ -274,8 +290,13 @@ XPC_INLINE size_t xpc_unpack_decode_int(uint8_t* out, const uint8_t* buf) {
 		++buf_idx;
 	}
 
-	uint8_t prev_byte_mask = (0xff << (8 - leftover_bits)) >> (8 - leftover_bits);
+	uint8_t prev_byte_mask = xpc_pack_generate_mask(leftover_bits, true);
+	uint8_t bits_left_in_encoding_segment = 7 - leftover_bits;
+	uint8_t next_byte_mask = xpc_pack_generate_mask(bits_left_in_encoding_segment, false) >> 1;
 	out[out_idx] |= (buf[buf_idx] & prev_byte_mask) << (8 - leftover_bits);
+	if ((buf[buf_idx] & next_byte_mask) != 0) {
+		out[out_idx + 1] = (buf[buf_idx] & next_byte_mask) >> leftover_bits;
+	}
 
 	return buf_idx + 1;
 };
@@ -285,11 +306,11 @@ XPC_INLINE struct xpc_object* xpc_unpack(const void* buf, size_t size, size_t* p
 
 XPC_INLINE void xpc_pack_encode_entry(uint8_t* out, size_t* size, size_t* offset, struct xpc_object* val_xo) {
 	size_t val_size = 0;
-	xpc_pack(val_xo, out + *offset, &val_size);
+	xpc_pack(val_xo, out ? out + *offset : out, &val_size);
 	if (xpc_pack_is_variable_length(val_xo->xo_xpc_type)) {
-		size_t val_size_le = sizeof(size_t) == 4 ? htole32(val_size) : htole64(val_size);
+		size_t val_size_le = sizeof(size_t) == 4 ? OSSwapHostToLittleInt32(val_size) : OSSwapHostToLittleInt64(val_size);
 		size_t size_bits = xpc_pack_encode_int_bits(&val_size_le, sizeof(size_t), false);
-		size_t size_size = ((size_bits - (8 - XPC_PACK_TYPE_BITS)) + 7) / 8;
+		size_t size_size = XPC_PACK_INT_EXTRA_BYTES(size_bits);
 		if (out) {
 			if (size_size > 0 && val_size > 1)
 				memmove(out + *offset + 1 + size_size, out + *offset + 1, val_size);
@@ -312,7 +333,7 @@ XPC_INLINE struct xpc_object* xpc_unpack_decode_entry(const uint8_t* in, size_t 
 		size_t val_size_le = 0;
 		// `- 1` because part of the size is encoded into the type byte
 		size_t val_size_size = xpc_unpack_decode_int(&val_size_le, in + *offset) - 1;
-		size_t val_size = sizeof(size_t) == 4 ? le32toh(val_size_le) : le64toh(val_size_le);
+		size_t val_size = sizeof(size_t) == 4 ? OSSwapLittleToHostInt32(val_size_le) : OSSwapLittleToHostInt64(val_size_le);
 		*offset += val_size_size;
 		xo = xpc_unpack(in + *offset, val_size, &val_packed_size, value_type);
 		if (val_packed_size != val_size) {
@@ -336,25 +357,26 @@ XPC_INLINE int xpc_pack(struct xpc_object* xo, void* buf, size_t* final_size) {
 
 	switch (xo->xo_xpc_type) {
 		case _XPC_TYPE_DICTIONARY: {
-			__block size_t offset = 0;
+			__block size_t offset = size;
 			xpc_dictionary_apply(xo, ^bool(const char* key, xpc_object_t value) {
 				struct xpc_object* val_xo = value;
 				size_t key_size = strlen(key) + 1;
-				size += 1 + key_size;
+				size += key_size;
 				if (out) {
-					offset += 1;
 					strncpy(out + offset, key, key_size - 1);
 					offset += key_size;
 					out[offset - 1] = '\0';
 				}
 				xpc_pack_encode_entry(out, &size, &offset, val_xo);
+				return true;
 			});
 		} break;
 		case _XPC_TYPE_ARRAY: {
-			size_t offset = 0;
+			__block size_t offset = size;
 			xpc_array_apply(xo, ^bool(size_t idx, xpc_object_t value) {
 				struct xpc_object* val_xo = value;
 				xpc_pack_encode_entry(out, &size, &offset, val_xo);
+				return true;
 			});
 		} break;
 		case _XPC_TYPE_BOOL: {
@@ -364,17 +386,17 @@ XPC_INLINE int xpc_pack(struct xpc_object* xo, void* buf, size_t* final_size) {
 		case _XPC_TYPE_DATE:
 		case _XPC_TYPE_INT64: {
 			int64_t val = xo->xo_xpc_type == _XPC_TYPE_DATE ? xpc_date_get_value(xo) : xpc_int64_get_value(xo);
-			int64_t val_le = htole64(val);
+			int64_t val_le = OSSwapHostToLittleInt64(val);
 			size_t val_bits = xpc_pack_encode_int_bits(&val_le, sizeof(int64_t), false);
-			size += ((val_bits - (8 - XPC_PACK_TYPE_BITS)) + 7) / 8;
+			size += XPC_PACK_INT_EXTRA_BYTES(val_bits);
 			if (out)
 				xpc_pack_encode_int(out, &val_le, sizeof(int64_t));
 		} break;
 		case _XPC_TYPE_UINT64: {
-			uint64_t val = xpc_uint64_get_value(xo->xo_uint);
-			uint64_t val_le = htole64(val);
+			uint64_t val = xpc_uint64_get_value(xo);
+			uint64_t val_le = OSSwapHostToLittleInt64(val);
 			size_t val_bits = xpc_pack_encode_int_bits(&val_le, sizeof(uint64_t), false);
-			size += ((val_bits - (8 - XPC_PACK_TYPE_BITS)) + 7) / 8;
+			size += XPC_PACK_INT_EXTRA_BYTES(val_bits);
 			if (out)
 				xpc_pack_encode_int(out, &val_le, sizeof(uint64_t));
 		} break;
@@ -396,9 +418,9 @@ XPC_INLINE int xpc_pack(struct xpc_object* xo, void* buf, size_t* final_size) {
 		//case _XPC_TYPE_UUID: {} break;
 		case _XPC_TYPE_FD: {
 			int val = xo->xo_u.port;
-			int val_le = htole32(val);
+			int val_le = OSSwapHostToLittleInt32(val);
 			size_t val_bits = xpc_pack_encode_int_bits(&val_le, sizeof(int), false);
-			size += ((val_bits - (8 - XPC_PACK_TYPE_BITS)) + 7) / 8;
+			size += XPC_PACK_INT_EXTRA_BYTES(val_bits);
 			if (out)
 				xpc_pack_encode_int(out, &val_le, sizeof(int));
 		} break;
@@ -411,9 +433,9 @@ XPC_INLINE int xpc_pack(struct xpc_object* xo, void* buf, size_t* final_size) {
 			//
 			// TODO: figure out how to encode the double portably
 			double val = xpc_double_get_value(xo);
-			uint64_t val_le = sizeof(double) == 4 ? (uint64_t)htole32(*(uint32_t*)&val) : htole64(*(uint64_t*)&val);
+			uint64_t val_le = sizeof(double) == 4 ? (uint64_t)OSSwapHostToLittleInt32(*(uint32_t*)&val) : OSSwapHostToLittleInt64(*(uint64_t*)&val);
 			size_t val_bits = xpc_pack_encode_int_bits(&val_le, sizeof(uint64_t), false);
-			size += ((val_bits - (8 - XPC_PACK_TYPE_BITS)) + 7) / 8;
+			size += XPC_PACK_INT_EXTRA_BYTES(val_bits);
 			if (out)
 				xpc_pack_encode_int(out, &val_le, sizeof(uint64_t));
 		} break;
@@ -492,21 +514,29 @@ XPC_INLINE struct xpc_object* xpc_unpack(const void* buf, size_t size, size_t* p
 		case _XPC_TYPE_INT64: {
 			int64_t val_le = 0;
 			offset += xpc_unpack_decode_int(&val_le, in + offset);
-			int64_t val = le64toh(val_le);
+			int64_t val = OSSwapLittleToHostInt64(val_le);
 			xo = xo_xpc_type == _XPC_TYPE_DATE ? xpc_date_create(val) : xpc_int64_create(val);
 		} break;
 		case _XPC_TYPE_UINT64: {
 			uint64_t val_le = 0;
 			offset += xpc_unpack_decode_int(&val_le, in + offset);
-			uint64_t val = le64toh(val_le);
+			uint64_t val = OSSwapLittleToHostInt64(val_le);
 			xo = xpc_uint64_create(val);
 		} break;
-		case _XPC_TYPE_DATA: {} break;
-		case _XPC_TYPE_STRING: {} break;
+		case _XPC_TYPE_DATA: {
+			++offset;
+			xo = xpc_data_create(in + offset, size - offset);
+			offset += size - offset;
+		} break;
+		case _XPC_TYPE_STRING: {
+			++offset;
+			xo = xpc_string_create(in + offset);
+			offset += strlen(in + offset) + 1;
+		} break;
 		case _XPC_TYPE_FD: {
 			int val_le = 0;
 			offset += xpc_unpack_decode_int(&val_le, in + offset);
-			int val = le32toh(val_le);
+			int val = OSSwapLittleToHostInt32(val_le);
 
 			xo = malloc(sizeof(struct xpc_object));
 			if (xo) {
@@ -521,12 +551,13 @@ XPC_INLINE struct xpc_object* xpc_unpack(const void* buf, size_t size, size_t* p
 		case _XPC_TYPE_DOUBLE: {
 			uint64_t uval_le = 0;
 			offset += xpc_unpack_decode_int(&uval_le, in + offset);
-			uint64_t uval = le64toh(uval_le);
+			uint64_t uval = OSSwapLittleToHostInt64(uval_le);
 			double val = *(double*)&uval_le;
 			xo = xpc_uint64_create(val);
 		} break;
 		case _XPC_TYPE_NULL: {
 			xo = xpc_null_create();
+			++offset;
 		} break;
 		default: {
 			debugf("can't unpack unsupported type: %d", xo_xpc_type);
@@ -909,7 +940,7 @@ xpc_pipe_receive(mach_port_t local, mach_port_t *remote, xpc_object_t *result,
 	*id = message.id;
 	data_size = (int)message.size;
 	LOG("unpacking data_size=%d", data_size);
-	xo = xpc_unpack(&message.data, data_size, NULL, 0);
+	xo = xpc_unpack(message.data, data_size, NULL, 0);
 
 	tr = (mach_msg_trailer_t *)(((char *)&message) + request->msgh_size);
 	auditp = &((mach_msg_audit_trailer_t *)tr)->msgh_audit;
@@ -972,7 +1003,7 @@ xpc_pipe_try_receive(mach_port_t portset, xpc_object_t *requestobj, mach_port_t 
 	LOG("demux returned false\n");
 	data_size = request->msgh_size;
 	LOG("unpacking data_size=%d", data_size);
-	xo = xpc_unpack(&message.data, data_size, NULL, 0);
+	xo = xpc_unpack(message.data, data_size, NULL, 0);
 	/* is padding for alignment enforced in the kernel?*/
 	tr = (mach_msg_trailer_t *)(((char *)&message) + request->msgh_size);
 	auditp = &((mach_msg_audit_trailer_t *)tr)->msgh_audit;
