@@ -113,15 +113,11 @@ xpc_array_destroy(struct xpc_object *dict)
 	}
 }
 
-// number of bytes to allocate for the initial call to mach_msg
-// 8KiB
-#define XPC_MACH_MSG_INTIAL_BUFFER_LEN 8192
-
 /**
  * encoded buffer layout for different types:
  * 	dictionary = { 0x01, { key, encode_entry(encode_size(sizeof(value))?, value) }... }
  * 	array      = { 0x02, encode_entry(encode_size(sizeof(entry))?, entry)... }
- * 	bool       = { 0x03 | ((value ? 0x01 : 0x00) << 4) }
+ * 	bool       = { 0x03 | ((value ? 0x01 : 0x00) << XPC_PACK_TYPE_BITS) }
  * 	connection = { 0x04 }
  * 	endpoint   = { 0x05 }
  * 	null       = { 0x06 }
@@ -141,8 +137,7 @@ xpc_array_destroy(struct xpc_object *dict)
  * 	sizeof(x)                       = length of x in bytes
  * 	encode_int(type, x, max_bytes)  = encodes the provided integer into the minimum number of bytes
  * 	                                  possible. the high bit on each byte specifies whether the value has another byte.
- * 	                                  an optimization is made that uses the high four bits in the type byte
- * 	                                  to encode the value.
+ * 	                                  an optimization is made that uses the unused bits in the type byte to encode the value.
  * 	                                  encodes in little-endian.
  * 	encode_size(x)                  = encodes the provided integer into the minimum number of bytes
  * 	                                  possible, much like `encode_int`. the difference is that it doesn't automatically
@@ -154,11 +149,11 @@ xpc_array_destroy(struct xpc_object *dict)
  * 	                                  	{ value }
  *
  * notes:
- * 	* integral values are basically laid out in network-order (big-endian)
- * 	* many types that have variable length do not automatically include a stated length.
+ * 	* integral values are laid out in little-endian
+ * 	* many types that have variable length do not automatically include a stated length
  * 		* this is done to save precious bytes
- * 		* the only time size is explicitly specified, is when variable-size structures are used
- * 		  inside other variable-size structures (e.g. dictionary in an array, data in a dictionary, etc.).
+ * 		* the only time size is explicitly specified is when variable-size structures are used
+ * 		  inside other variable-size structures (e.g. dictionary in an array, data in a dictionary, array in an array, etc.).
  * 		* this rule does *not* apply to strings and integral values, as they are technically not considered "variable-length"
  * 			* strings are null-terminated, so it's obvious when you've reached their end
  * 			* integral values encoded with encode_int likewise also already carry an indiciation
