@@ -548,7 +548,7 @@ XPC_INLINE struct xpc_object* xpc_unpack(const void* buf, size_t size, size_t* p
 			offset += xpc_unpack_decode_int(&uval_le, in + offset);
 			uint64_t uval = OSSwapLittleToHostInt64(uval_le);
 			double val = *(double*)&uval_le;
-			xo = xpc_uint64_create(val);
+			xo = xpc_double_create(val);
 		} break;
 		case _XPC_TYPE_NULL: {
 			xo = xpc_null_create();
