@@ -35,8 +35,6 @@ set(xpc_sources
 	xpc_private.c
 	xpc_type.c
 	subr_sbuf.c
-	subr_nvlist.c
-	subr_nvpair.c
 	xpc_pipe.c
 	reboot3.c
 )

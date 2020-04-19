@@ -37,6 +37,7 @@
 #include <uuid/uuid.h>
 #include <stdio.h>
 #include "xpc_internal.h"
+#include <libkern/OSByteOrder.h>
 
 #define RECV_BUFFER_SIZE	65536
 
@@ -82,8 +83,6 @@ fail_log(const char *exp)
 	//abort();
 }
 
-static void nvlist_add_prim(nvlist_t *nv, const char *key, xpc_object_t xobj);
-
 static void
 xpc_dictionary_destroy(struct xpc_object *dict)
 {
@@ -114,40 +113,457 @@ xpc_array_destroy(struct xpc_object *dict)
 	}
 }
 
-static int
-xpc_pack(struct xpc_object *xo, void *buf, size_t *size)
-{
-	nvlist_t *nv;
-	void *packed;
+/**
+ * encoded buffer layout for different types:
+ * 	dictionary = { 0x01, { key, encode_entry(encode_size(sizeof(value))?, value) }... }
+ * 	array      = { 0x02, encode_entry(encode_size(sizeof(entry))?, entry)... }
+ * 	bool       = { 0x03 | ((value ? 0x01 : 0x00) << XPC_PACK_TYPE_BITS) }
+ * 	connection = { 0x04 }
+ * 	endpoint   = { 0x05 }
+ * 	null       = { 0x06 }
+ * 	activity   = { 0x07 }
+ * 	int64      = { encode_int(0x08, value, sizeof(int64_t)) }
+ * 	uint64     = { encode_int(0x09, value, sizeof(uint64_t)) }
+ * 	date       = { encode_int(0x0a, value, sizeof(int64_t)) }
+ * 	data       = { 0x0b, values... }
+ * 	string     = { 0x0c, bytes... }
+ * 	uuid       = { encode_int(0x0d, value, 16) }
+ * 	fd         = { encode_int(0x0e, value, sizeof(int)) }
+ * 	shmem      = { 0x0f }
+ * 	error      = { 0x10 }
+ * 	double     = { encode_int(0x11, value, sizeof(double)) }
+ *
+ * where:
+ * 	sizeof(x)                       = length of x in bytes
+ * 	encode_int(type, x, max_bytes)  = encodes the provided integer into the minimum number of bytes
+ * 	                                  possible. the high bit on each byte specifies whether the value has another byte.
+ * 	                                  an optimization is made that uses the unused bits in the type byte to encode the value.
+ * 	                                  encodes in little-endian.
+ * 	encode_size(x)                  = encodes the provided integer into the minimum number of bytes
+ * 	                                  possible, much like `encode_int`. the difference is that it doesn't automatically
+ * 	                                  encode the type into the first byte.
+ * 	                                  encodes in little-endian.
+ * 	encode_entry(size, value)       = if the value is variable-length type:
+ * 	                                  	{ size[0] | value[0], size[1..], value[1..] }
+ * 	                                  otherwise:
+ * 	                                  	{ value }
+ *
+ * notes:
+ * 	* integral values are laid out in little-endian
+ * 	* many types that have variable length do not automatically include a stated length
+ * 		* this is done to save precious bytes
+ * 		* the only time size is explicitly specified is when variable-size structures are used
+ * 		  inside other variable-size structures (e.g. dictionary in an array, data in a dictionary, array in an array, etc.).
+ * 		* this rule does *not* apply to strings and integral values, as they are technically not considered "variable-length"
+ * 			* strings are null-terminated, so it's obvious when you've reached their end
+ * 			* integral values encoded with encode_int likewise also already carry an indiciation
+ * 			  of their length as part of their format
+ * 	* there may have been additional size optimization that could've been made that i didn't know about,
+ * 	  but i was also trying to find a balance between size-efficiency, computational-efficiency, and simplicity.
+ */
 
-	nv = xpc2nv(xo);
+#define XPC_PACK_TYPE_MASK 0x1f
+#define XPC_PACK_TYPE_BITS 5
+#define XPC_PACK_INT_INITIAL_BITS (8 - (XPC_PACK_TYPE_BITS + 1))
+#define XPC_PACK_INT_EXTRA_BYTES(x) (((x - (8 - XPC_PACK_TYPE_BITS)) + 7) / 8)
 
-	packed = nvlist_pack_buffer(nv, NULL, size);
-	if (packed == NULL) {
-		errno = EINVAL;
-		return (-1);
+XPC_INLINE bool xpc_pack_is_variable_length(uint8_t xo_xpc_type) {
+	return xo_xpc_type == _XPC_TYPE_DICTIONARY || xo_xpc_type == _XPC_TYPE_ARRAY || xo_xpc_type == _XPC_TYPE_DATA;
+};
+
+XPC_INLINE uint8_t xpc_pack_generate_mask(uint8_t bits, bool least_significant) {
+	static const uint8_t lookup_table[] = {
+		0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff,
+	};
+	return lookup_table[bits] >> (least_significant ? (8 - bits) : 0);
+};
+
+// buf must be little-endian
+XPC_INLINE size_t xpc_pack_encode_int_bits(const uint8_t* buf, size_t buf_size, bool raw) {
+	while (buf_size > 0 && buf[buf_size - 1] == 0)
+		--buf_size;
+
+	if (buf_size == 0)
+		return 0;
+
+	uint8_t msb = buf[buf_size - 1];
+	size_t leading_bit_count = 8;
+	for (uint8_t i = 8; i > 0; --i) {
+		if ((msb & (1 << (i - 1))) == 0) {
+			--leading_bit_count;
+		} else {
+			break;
+		}
 	}
 
-	if (buf != NULL)
-		memcpy(buf, packed, *size);
+	// number of bits needed for actual number
+	size_t raw_bits = ((buf_size - 1) * 8) + leading_bit_count;
 
-	nvlist_destroy(nv);
-	free(packed);
-	return (0);
-}
+	if (raw)
+		return raw_bits;
 
-static struct xpc_object *
-xpc_unpack(void *buf, size_t size)
-{
-	struct xpc_object *xo;
-	nvlist_t *nv;
+	if (raw_bits <= XPC_PACK_INT_INITIAL_BITS)
+		return XPC_PACK_INT_INITIAL_BITS + 1;
 
-	nv = nvlist_unpack(buf, size);
-	xo = nv2xpc(nv);
+	return raw_bits + ((raw_bits - XPC_PACK_INT_INITIAL_BITS) / 7) + 1;
+};
 
-	nvlist_destroy(nv);
-	return (xo);
-}
+// buf must be little-endian
+XPC_INLINE void xpc_pack_encode_int(uint8_t* out, const uint8_t* buf, size_t buf_size) {
+	if (buf_size == 0)
+		return;
+
+	uint8_t initial_mask = xpc_pack_generate_mask(8 - XPC_PACK_TYPE_BITS - 1, true);
+	out[0] = ((buf[0] & initial_mask) << XPC_PACK_TYPE_BITS) | out[0] & XPC_PACK_TYPE_MASK;
+
+	if ((buf[0] & ~initial_mask) == 0)
+		return;
+
+	out[0] |= 1 << 7;
+
+	size_t raw_bits = xpc_pack_encode_int_bits(buf, buf_size, true) - (8 - (XPC_PACK_TYPE_BITS + 1));
+	size_t leftover_bits = XPC_PACK_TYPE_BITS + 1;
+	size_t buf_idx = 0;
+	size_t out_idx = 1;
+
+	for (; raw_bits >= 7; raw_bits -= 7, ++out_idx) {
+		if (leftover_bits == 8) {
+			// 0x7f == 0b01111111
+			out[out_idx] = (1 << 7) | buf[buf_idx] & 0x7f;
+			leftover_bits = 1;
+		} else {
+			uint8_t prev_byte_mask = xpc_pack_generate_mask(leftover_bits, false);
+			uint8_t bits_left_in_encoding_segment = 7 - leftover_bits;
+			uint8_t next_byte_mask = xpc_pack_generate_mask(bits_left_in_encoding_segment, true);
+			out[out_idx] = (1 << 7) | ((buf[buf_idx] & prev_byte_mask) >> (8 - leftover_bits)) | ((buf[buf_idx + 1] & next_byte_mask) << leftover_bits);
+			leftover_bits = 8 - bits_left_in_encoding_segment;
+			++buf_idx;
+		}
+	}
+
+	if (raw_bits == 0) {
+		// no next byte; remove the indicator
+		// 0x7f == 0b01111111
+		out[out_idx - 1] &= 0x7f;
+	} else {
+		uint8_t prev_byte_mask = xpc_pack_generate_mask(leftover_bits, false);
+		out[out_idx] = (buf[buf_idx] & prev_byte_mask) >> (8 - leftover_bits);
+		if (leftover_bits < raw_bits) {
+			uint8_t bits_left_in_encoding_segment = 7 - leftover_bits;
+			uint8_t next_byte_mask = xpc_pack_generate_mask(bits_left_in_encoding_segment, true);
+			out[out_idx] |= (buf[buf_idx + 1] & next_byte_mask) << leftover_bits;
+		}
+	}
+};
+
+XPC_INLINE size_t xpc_unpack_decode_int(uint8_t* out, const uint8_t* buf) {
+	// `>> 1` because we don't want to include the most significant bit
+	uint8_t initial_mask = xpc_pack_generate_mask(8 - XPC_PACK_TYPE_BITS - 1, false) >> 1;
+	out[0] = (buf[0] & initial_mask) >> XPC_PACK_TYPE_BITS;
+
+	if ((buf[0] & (1 << 7)) == 0)
+		return 1;
+
+	size_t leftover_bits = XPC_PACK_TYPE_BITS + 1;
+	size_t out_idx = 0;
+	size_t buf_idx = 1;
+
+	while ((buf[buf_idx] & (1 << 7)) != 0) {
+		if (leftover_bits == 8) {
+			// 0x7f == 0b01111111
+			out[out_idx] = buf[buf_idx] & 0x7f;
+			leftover_bits = 1;
+		} else {
+			uint8_t prev_byte_mask = xpc_pack_generate_mask(leftover_bits, true);
+			uint8_t bits_left_in_encoding_segment = 7 - leftover_bits;
+			uint8_t next_byte_mask = xpc_pack_generate_mask(bits_left_in_encoding_segment, false) >> 1;
+			out[out_idx] |= (buf[buf_idx] & prev_byte_mask) << (8 - leftover_bits);
+			out[out_idx + 1] = (buf[buf_idx] & next_byte_mask) >> leftover_bits;
+			leftover_bits = 8 - bits_left_in_encoding_segment;
+			++out_idx;
+		}
+		++buf_idx;
+	}
+
+	uint8_t prev_byte_mask = xpc_pack_generate_mask(leftover_bits, true);
+	uint8_t bits_left_in_encoding_segment = 7 - leftover_bits;
+	uint8_t next_byte_mask = xpc_pack_generate_mask(bits_left_in_encoding_segment, false) >> 1;
+	out[out_idx] |= (buf[buf_idx] & prev_byte_mask) << (8 - leftover_bits);
+	if ((buf[buf_idx] & next_byte_mask) != 0) {
+		out[out_idx + 1] = (buf[buf_idx] & next_byte_mask) >> leftover_bits;
+	}
+
+	return buf_idx + 1;
+};
+
+XPC_INLINE int xpc_pack(struct xpc_object* xo, void* buf, size_t* final_size);
+XPC_INLINE struct xpc_object* xpc_unpack(const void* buf, size_t size, size_t* packed_size, uint8_t declared_type);
+
+XPC_INLINE void xpc_pack_encode_entry(uint8_t* out, size_t* size, size_t* offset, struct xpc_object* val_xo) {
+	size_t val_size = 0;
+	xpc_pack(val_xo, out ? out + *offset : out, &val_size);
+	if (xpc_pack_is_variable_length(val_xo->xo_xpc_type)) {
+		size_t val_size_le = sizeof(size_t) == 4 ? OSSwapHostToLittleInt32(val_size) : OSSwapHostToLittleInt64(val_size);
+		size_t size_bits = xpc_pack_encode_int_bits(&val_size_le, sizeof(size_t), false);
+		size_t size_size = XPC_PACK_INT_EXTRA_BYTES(size_bits);
+		if (out) {
+			if (size_size > 0 && val_size > 1)
+				memmove(out + *offset + 1 + size_size, out + *offset + 1, val_size);
+			xpc_pack_encode_int(out + *offset, &val_size_le, sizeof(size_t));
+		}
+		*size += size_size;
+		if (out)
+			*offset += size_size;
+	}
+	*size += val_size;
+	if (out)
+		*offset += val_size;
+};
+
+XPC_INLINE struct xpc_object* xpc_unpack_decode_entry(const uint8_t* in, size_t size, size_t* offset) {
+	struct xpc_object* xo = NULL;
+	uint8_t value_type = in[*offset] & XPC_PACK_TYPE_MASK;
+	size_t val_packed_size = 0;
+	if (xpc_pack_is_variable_length(value_type)) {
+		size_t val_size_le = 0;
+		// `- 1` because part of the size is encoded into the type byte
+		size_t val_size_size = xpc_unpack_decode_int(&val_size_le, in + *offset) - 1;
+		size_t val_size = sizeof(size_t) == 4 ? OSSwapLittleToHostInt32(val_size_le) : OSSwapLittleToHostInt64(val_size_le);
+		*offset += val_size_size;
+		xo = xpc_unpack(in + *offset, val_size, &val_packed_size, value_type);
+		if (val_packed_size != val_size) {
+			// something's up
+			debugf("val_packed_size != val_size (%zu != %zu)", val_packed_size, val_size);
+			return NULL;
+		}
+	} else {
+		xo = xpc_unpack(in + *offset, size - *offset, &val_packed_size, 0);
+	}
+	*offset += val_packed_size;
+	return xo;
+};
+
+XPC_INLINE int xpc_pack(struct xpc_object* xo, void* buf, size_t* final_size) {
+	uint8_t* out = buf;
+	__block size_t size = 1;
+
+	if (out)
+		out[0] = xo->xo_xpc_type;
+
+	switch (xo->xo_xpc_type) {
+		case _XPC_TYPE_DICTIONARY: {
+			__block size_t offset = size;
+			xpc_dictionary_apply(xo, ^bool(const char* key, xpc_object_t value) {
+				struct xpc_object* val_xo = value;
+				size_t key_size = strlen(key) + 1;
+				size += key_size;
+				if (out) {
+					strncpy(out + offset, key, key_size - 1);
+					offset += key_size;
+					out[offset - 1] = '\0';
+				}
+				xpc_pack_encode_entry(out, &size, &offset, val_xo);
+				return true;
+			});
+		} break;
+		case _XPC_TYPE_ARRAY: {
+			__block size_t offset = size;
+			xpc_array_apply(xo, ^bool(size_t idx, xpc_object_t value) {
+				struct xpc_object* val_xo = value;
+				xpc_pack_encode_entry(out, &size, &offset, val_xo);
+				return true;
+			});
+		} break;
+		case _XPC_TYPE_BOOL: {
+			if (out)
+				out[0] |= (xpc_bool_get_value(xo) ? 1 : 0) << XPC_PACK_TYPE_BITS;
+		} break;
+		case _XPC_TYPE_DATE:
+		case _XPC_TYPE_INT64: {
+			int64_t val = xo->xo_xpc_type == _XPC_TYPE_DATE ? xpc_date_get_value(xo) : xpc_int64_get_value(xo);
+			int64_t val_le = OSSwapHostToLittleInt64(val);
+			size_t val_bits = xpc_pack_encode_int_bits(&val_le, sizeof(int64_t), false);
+			size += XPC_PACK_INT_EXTRA_BYTES(val_bits);
+			if (out)
+				xpc_pack_encode_int(out, &val_le, sizeof(int64_t));
+		} break;
+		case _XPC_TYPE_UINT64: {
+			uint64_t val = xpc_uint64_get_value(xo);
+			uint64_t val_le = OSSwapHostToLittleInt64(val);
+			size_t val_bits = xpc_pack_encode_int_bits(&val_le, sizeof(uint64_t), false);
+			size += XPC_PACK_INT_EXTRA_BYTES(val_bits);
+			if (out)
+				xpc_pack_encode_int(out, &val_le, sizeof(uint64_t));
+		} break;
+		case _XPC_TYPE_DATA: {
+			size_t len = xpc_data_get_length(xo);
+			size += len;
+			if (out)
+				memcpy(out + 1, xpc_data_get_bytes_ptr(xo), len);
+		} break;
+		case _XPC_TYPE_STRING: {
+			size_t len = xpc_string_get_length(xo);
+			size += len + 1;
+			if (out) {
+				strncpy(out + 1, xpc_string_get_string_ptr(xo), len);
+				out[1 + len] = '\0';
+			}
+		} break;
+		// currently unimplemented
+		//case _XPC_TYPE_UUID: {} break;
+		case _XPC_TYPE_FD: {
+			int val = xo->xo_u.port;
+			int val_le = OSSwapHostToLittleInt32(val);
+			size_t val_bits = xpc_pack_encode_int_bits(&val_le, sizeof(int), false);
+			size += XPC_PACK_INT_EXTRA_BYTES(val_bits);
+			if (out)
+				xpc_pack_encode_int(out, &val_le, sizeof(int));
+		} break;
+		case _XPC_TYPE_DOUBLE: {
+			// this is a rather simplistic implementation that assumes that the internal layout
+			// of a double is the same on sender and reeceiver
+			// that's never a good assumption.
+			// (although from what i can tell, XPC is only used for communication between processes
+			// on the same system, so this shouldn't be a problem)
+			//
+			// TODO: figure out how to encode the double portably
+			double val = xpc_double_get_value(xo);
+			uint64_t val_le = sizeof(double) == 4 ? (uint64_t)OSSwapHostToLittleInt32(*(uint32_t*)&val) : OSSwapHostToLittleInt64(*(uint64_t*)&val);
+			size_t val_bits = xpc_pack_encode_int_bits(&val_le, sizeof(uint64_t), false);
+			size += XPC_PACK_INT_EXTRA_BYTES(val_bits);
+			if (out)
+				xpc_pack_encode_int(out, &val_le, sizeof(uint64_t));
+		} break;
+		case _XPC_TYPE_NULL: break;
+		default: {
+			debugf("can't pack unsupported type: %d", xo->xo_xpc_type);
+		} break;
+	};
+
+	if (final_size)
+		*final_size = size;
+
+	return 0;
+};
+
+// initial calls (i.e. anyone using this function) should call it like so:
+// 	xpc_unpack(data, data_size, NULL, 0)
+// or
+// 	xpc_unpack(data, data_size, &packed_size, 0)
+// in other words, the `declared_type` parameter should always be 0
+XPC_INLINE struct xpc_object* xpc_unpack(const void* buf, size_t size, size_t* packed_size, uint8_t declared_type) {
+	if (size == 0) {
+		if (packed_size)
+			*packed_size = 0;
+		return NULL;
+	}
+
+	const uint8_t* in = buf;
+	uint8_t xo_xpc_type = declared_type == 0 ? in[0] & XPC_PACK_TYPE_MASK : declared_type;
+	size_t offset = 0;
+	struct xpc_object* xo = NULL;
+
+	switch (xo_xpc_type) {
+		case _XPC_TYPE_DICTIONARY: {
+			xo = xpc_dictionary_create(NULL, NULL, 0);
+			++offset;
+
+			while (offset < size) {
+				const char* key = in + offset;
+				size_t key_size = strlen(key) + 1;
+				offset += key_size;
+				struct xpc_object* val = xpc_unpack_decode_entry(in, size, &offset);
+				if (!val) {
+					debugf("failed to unpack dictionary entry");
+					xpc_release(xo);
+					xo = NULL;
+					offset = 0;
+					break;
+				}
+				xpc_dictionary_set_value(xo, key, val);
+				xpc_release(val);
+			}
+		} break;
+		case _XPC_TYPE_ARRAY: {
+			xo = xpc_array_create(NULL, 0);
+			++offset;
+
+			while (offset < size) {
+				struct xpc_object* val = xpc_unpack_decode_entry(in, size, &offset);
+				if (!val) {
+					debugf("failed to unpack array entry");
+					xpc_release(xo);
+					xo = NULL;
+					offset = 0;
+					break;
+				}
+				xpc_array_append_value(xo, val);
+				xpc_release(val);
+			}
+		} break;
+		case _XPC_TYPE_BOOL: {
+			xo = xpc_bool_create(in[0] >> XPC_PACK_TYPE_BITS);
+			++offset;
+		} break;
+		case _XPC_TYPE_DATE:
+		case _XPC_TYPE_INT64: {
+			int64_t val_le = 0;
+			offset += xpc_unpack_decode_int(&val_le, in + offset);
+			int64_t val = OSSwapLittleToHostInt64(val_le);
+			xo = xo_xpc_type == _XPC_TYPE_DATE ? xpc_date_create(val) : xpc_int64_create(val);
+		} break;
+		case _XPC_TYPE_UINT64: {
+			uint64_t val_le = 0;
+			offset += xpc_unpack_decode_int(&val_le, in + offset);
+			uint64_t val = OSSwapLittleToHostInt64(val_le);
+			xo = xpc_uint64_create(val);
+		} break;
+		case _XPC_TYPE_DATA: {
+			++offset;
+			xo = xpc_data_create(in + offset, size - offset);
+			offset += size - offset;
+		} break;
+		case _XPC_TYPE_STRING: {
+			++offset;
+			xo = xpc_string_create(in + offset);
+			offset += strlen(in + offset) + 1;
+		} break;
+		case _XPC_TYPE_FD: {
+			int val_le = 0;
+			offset += xpc_unpack_decode_int(&val_le, in + offset);
+			int val = OSSwapLittleToHostInt32(val_le);
+
+			xo = malloc(sizeof(struct xpc_object));
+			if (xo) {
+				xo->xo_size = sizeof(xo->xo_u.port);
+				xo->xo_xpc_type = _XPC_TYPE_FD;
+				xo->xo_flags = 0;
+				xo->xo_u.port = val;
+				xo->xo_refcnt = 1;
+				xo->xo_audit_token = NULL;
+			}
+		} break;
+		case _XPC_TYPE_DOUBLE: {
+			uint64_t uval_le = 0;
+			offset += xpc_unpack_decode_int(&uval_le, in + offset);
+			uint64_t uval = OSSwapLittleToHostInt64(uval_le);
+			double val = *(double*)&uval_le;
+			xo = xpc_double_create(val);
+		} break;
+		case _XPC_TYPE_NULL: {
+			xo = xpc_null_create();
+			++offset;
+		} break;
+		default: {
+			debugf("can't unpack unsupported type: %d", xo_xpc_type);
+		} break;
+	}
+
+	if (packed_size)
+		*packed_size = offset;
+
+	return xo;
+};
 
 void
 xpc_object_destroy(struct xpc_object *xo)
@@ -519,7 +935,7 @@ xpc_pipe_receive(mach_port_t local, mach_port_t *remote, xpc_object_t *result,
 	*id = message.id;
 	data_size = (int)message.size;
 	LOG("unpacking data_size=%d", data_size);
-	xo = xpc_unpack(&message.data, data_size);
+	xo = xpc_unpack(message.data, data_size, NULL, 0);
 
 	tr = (mach_msg_trailer_t *)(((char *)&message) + request->msgh_size);
 	auditp = &((mach_msg_audit_trailer_t *)tr)->msgh_audit;
@@ -582,7 +998,7 @@ xpc_pipe_try_receive(mach_port_t portset, xpc_object_t *requestobj, mach_port_t 
 	LOG("demux returned false\n");
 	data_size = request->msgh_size;
 	LOG("unpacking data_size=%d", data_size);
-	xo = xpc_unpack(&message.data, data_size);
+	xo = xpc_unpack(message.data, data_size, NULL, 0);
 	/* is padding for alignment enforced in the kernel?*/
 	tr = (mach_msg_trailer_t *)(((char *)&message) + request->msgh_size);
 	auditp = &((mach_msg_audit_trailer_t *)tr)->msgh_audit;

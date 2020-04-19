@@ -30,7 +30,6 @@
 
 #include <sys/queue.h>
 #include "xpc/xpc.h"
-#include <nv.h>
 
 #ifdef XPC_DEBUG
 #define debugf(...) 				\
@@ -150,7 +149,6 @@ struct xpc_service {
 	TAILQ_HEAD(, xpc_connection) xs_connections;
 };
 
-#define xo_nv xo_u.nv
 #define xo_str xo_u.str
 #define xo_bool xo_u.b
 #define xo_uint xo_u.ui
@@ -170,8 +168,6 @@ __private_extern__ struct xpc_object *_xpc_prim_create(int type, xpc_u value,
 __private_extern__ struct xpc_object *_xpc_prim_create_flags(int type,
     xpc_u value, size_t size, uint16_t flags);
 __private_extern__ const char *_xpc_get_type_name(xpc_object_t obj);
-__private_extern__ struct xpc_object *nv2xpc(const nvlist_t *nv);
-__private_extern__ nvlist_t *xpc2nv(struct xpc_object *xo);
 __private_extern__ void xpc_object_destroy(struct xpc_object *xo);
 __private_extern__ int xpc_pipe_send(xpc_object_t obj, mach_port_t dst,
     mach_port_t local, uint64_t id);
