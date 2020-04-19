@@ -185,6 +185,7 @@ xpc_dictionary_set_bool(xpc_object_t xdict, const char *key, bool value)
 	xo = xdict;
 	xotmp = xpc_bool_create(value);
 	xpc_dictionary_set_value(xdict, key, xotmp);
+	xpc_release(xotmp);
 }
 
 void
@@ -195,6 +196,7 @@ xpc_dictionary_set_int64(xpc_object_t xdict, const char *key, int64_t value)
 	xo = xdict;
 	xotmp = xpc_int64_create(value);
 	xpc_dictionary_set_value(xdict, key, xotmp);
+	xpc_release(xotmp);
 }
 
 void
@@ -204,7 +206,8 @@ xpc_dictionary_set_uint64(xpc_object_t xdict, const char *key, uint64_t value)
 
 	xo = xdict;
 	xotmp = xpc_uint64_create(value);
-	xpc_dictionary_set_value(xdict, key, xotmp); 
+	xpc_dictionary_set_value(xdict, key, xotmp);
+	xpc_release(xotmp);
 }
 
 void
@@ -215,6 +218,7 @@ xpc_dictionary_set_string(xpc_object_t xdict, const char *key, const char *value
 	xo = xdict;
 	xotmp = xpc_string_create(value);
 	xpc_dictionary_set_value(xdict, key, xotmp);
+	xpc_release(xotmp);
 }
 
 bool xpc_dictionary_get_bool(xpc_object_t xdict, const char* key) {
@@ -270,17 +274,17 @@ xpc_dictionary_apply(xpc_object_t xdict, xpc_dictionary_applier_t applier)
 	return (true);
 }
 
-const void *
-xpc_dictionary_get_data(xpc_object_t xdict, const char *key, size_t *length)
-{
+const void* xpc_dictionary_get_data(xpc_object_t xdict, const char* key, size_t* length) {
+	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
+	*length = xpc_data_get_length(xo);
+	return xpc_data_get_bytes_ptr(xo);
+};
 
-}
-
-void
-xpc_dictionary_set_data(xpc_object_t xdict, const char *key, const void *bytes, size_t length)
-{
-
-}
+void xpc_dictionary_set_data(xpc_object_t xdict, const char* key, const void* bytes, size_t length) {
+	xpc_object_t xo = xpc_data_create(bytes, length);
+	xpc_dictionary_set_value(xdict, key, xo);
+	xpc_release(xo);
+};
 
 xpc_connection_t
 xpc_dictionary_get_remote_connection(xpc_object_t xdict)
@@ -299,9 +303,11 @@ xpc_dictionary_set_fd(xpc_object_t xdict, const char *key, int fd)
 {
 }
 
-void
-xpc_dictionary_set_double(xpc_object_t xdict, const char *key, double value) {
-}
+void xpc_dictionary_set_double(xpc_object_t xdict, const char* key, double value) {
+	xpc_object_t xo = xpc_double_create(value);
+	xpc_dictionary_set_value(xdict, key, xo);
+	xpc_release(xo);
+};
 
 const uint8_t *
 xpc_dictionary_get_uuid(xpc_object_t xdict, const char *key)
