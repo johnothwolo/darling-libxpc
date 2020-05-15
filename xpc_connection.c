@@ -31,6 +31,7 @@
 #include <xpc/xpc.h>
 #include <machine/atomic.h>
 #include <Block.h>
+#include <libkern/OSAtomic.h>
 #include "xpc_internal.h"
 
 #define XPC_CONNECTION_NEXT_ID(conn) (OSAtomicIncrement64(&conn->xc_last_id))
