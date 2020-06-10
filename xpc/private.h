@@ -14,7 +14,7 @@ typedef struct _xpc_pipe_s* xpc_pipe_t;
 
 void xpc_pipe_invalidate(xpc_pipe_t pipe);
 
-xpc_pipe_t xpc_pipe_create(int name, int arg2);
+xpc_pipe_t xpc_pipe_create(const char* name, int flags);
 
 xpc_object_t _od_rpc_call(const char *procname, xpc_object_t payload, xpc_pipe_t (*get_pipe)(bool));
 
@@ -33,7 +33,10 @@ void xpc_connection_set_instance(xpc_connection_t connection, uuid_t uid);
 void xpc_dictionary_set_mach_send(xpc_object_t object, const char* key, mach_port_t port);
 
 // Completely random. Not sure what the "actual" one is
-#define XPC_PIPE_FLAG_PRIVILEGED 7
+#define XPC_PIPE_PRIVILEGED 7
+#define XPC_PIPE_USE_SYNC_IPC_OVERRIDE 8
+
+#define XPC_PIPE_FLAG_PRIVILEGED XPC_PIPE_PRIVILEGED
 
 #ifdef __cplusplus
 }
