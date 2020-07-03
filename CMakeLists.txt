@@ -32,6 +32,7 @@ set(xpc_sources
 	subr_sbuf.c
 	xpc_pipe.c
 	reboot3.c
+	transaction_private.c
 )
 
 set(DYLIB_INSTALL_NAME "/usr/lib/system/libxpc.dylib")
