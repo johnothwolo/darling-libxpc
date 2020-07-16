@@ -324,3 +324,16 @@ xpc_array_apply(xpc_object_t xarray, xpc_array_applier_t applier)
 
 	return (true);
 }
+
+void* xpc_array_get_pointer(xpc_object_t xarray, size_t index) {
+	struct xpc_object* xo = xpc_array_get_value(xarray, index);
+	if (xo)
+		return xpc_pointer_get_value(xo);
+	return NULL;
+};
+
+void xpc_array_set_pointer(xpc_object_t xarray, size_t index, void* value) {
+	struct xpc_object* xo = xpc_pointer_create(value);
+	xpc_array_set_value(xarray, index, xo);
+	xpc_release(xo);
+};

@@ -52,6 +52,7 @@ xt _xpc_type_shmem;
 xt _xpc_type_string;
 xt _xpc_type_uuid;
 xt _xpc_type_double;
+xt _xpc_type_pointer;
 
 
 struct _xpc_bool_s {
@@ -82,7 +83,8 @@ static xpc_type_t xpc_typemap[] = {
 	XPC_TYPE_FD,
 	XPC_TYPE_SHMEM,
 	XPC_TYPE_ERROR,
-	XPC_TYPE_DOUBLE
+	XPC_TYPE_DOUBLE,
+	XPC_TYPE_POINTER,
 };
 
 static const char *xpc_typestr[] = {
@@ -103,7 +105,8 @@ static const char *xpc_typestr[] = {
 	"fd",
 	"shmem",
 	"error",
-	"double"
+	"double",
+	"pointer",
 };
 
 __private_extern__ struct xpc_object *
@@ -492,6 +495,8 @@ xpc_hash(xpc_object_t obj)
 			return ((bool)true);
 		});
 		return (hash);
+	case _XPC_TYPE_POINTER:
+		return ((size_t)xo->xo_u.ptr);
 	default:
 		return 0;
 	}
@@ -505,3 +510,21 @@ _xpc_get_type_name(xpc_object_t obj)
 	xo = obj;
 	return (xpc_typestr[xo->xo_xpc_type]);	
 }
+
+xpc_object_t xpc_pointer_create(void* value) {
+	xpc_u val;
+	val.ptr = (uintptr_t)value;
+	return _xpc_prim_create(_XPC_TYPE_POINTER, val, 1);
+};
+
+void* xpc_pointer_get_value(xpc_object_t xptr) {
+	struct xpc_object* xo = xptr;
+
+	if (xo == NULL)
+		return NULL;
+
+	if (xo->xo_xpc_type == _XPC_TYPE_POINTER)
+		return xo->xo_ptr;
+
+	return NULL;
+};

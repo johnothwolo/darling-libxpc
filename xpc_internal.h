@@ -65,7 +65,8 @@
 #define _XPC_TYPE_SHMEM			15
 #define _XPC_TYPE_ERROR			16
 #define _XPC_TYPE_DOUBLE		17
-#define _XPC_TYPE_MAX			_XPC_TYPE_DOUBLE
+#define _XPC_TYPE_POINTER		18
+#define _XPC_TYPE_MAX			_XPC_TYPE_POINTER
 
 #define	XPC_SEQID	"XPC sequence number"
 

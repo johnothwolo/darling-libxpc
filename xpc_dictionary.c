@@ -314,3 +314,23 @@ xpc_dictionary_get_uuid(xpc_object_t xdict, const char *key)
 {
 	return NULL;
 }
+
+xpc_object_t xpc_dictionary_get_dictionary(xpc_object_t xdict, const char* key) {
+	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
+	if (xo && xpc_get_type(xo) == XPC_TYPE_DICTIONARY)
+		return xo;
+	return NULL;
+};
+
+void* xpc_dictionary_get_pointer(xpc_object_t xdict, const char* key) {
+	xpc_object_t xo = xpc_dictionary_get_value(xdict, key);
+	if (xo)
+		return xpc_pointer_get_value(xo);
+	return NULL;
+};
+
+void xpc_dictionary_set_pointer(xpc_object_t xdict, const char* key, void* value) {
+	xpc_object_t xo = xpc_pointer_create(value);
+	xpc_dictionary_set_value(xdict, key, xo);
+	xpc_release(xo);
+};

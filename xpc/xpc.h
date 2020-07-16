@@ -319,6 +319,10 @@ __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_5_0)
 XPC_EXPORT
 const char *const _xpc_event_key_name;
 
+#define XPC_TYPE_POINTER (&_xpc_type_pointer)
+XPC_EXPORT
+XPC_TYPE(_xpc_type_pointer);
+
 #ifndef __XPC_BUILDING_XPC__
 #include <xpc/endpoint.h>
 #include <xpc/debug.h>
@@ -1764,6 +1768,14 @@ XPC_EXPORT XPC_MALLOC XPC_RETURNS_RETAINED XPC_WARN_RESULT XPC_NONNULL1
 xpc_connection_t
 xpc_array_create_connection(xpc_object_t xarray, size_t index);
 
+XPC_EXPORT
+void* _Nullable
+xpc_array_get_pointer(xpc_object_t xarray, size_t index);
+
+XPC_EXPORT
+void
+xpc_array_set_pointer(xpc_object_t xarray, size_t index, void* value);
+
 #pragma mark Dictionary
 /*!
  * @typedef xpc_dictionary_applier_t
@@ -2419,6 +2431,19 @@ XPC_EXPORT XPC_MALLOC XPC_RETURNS_RETAINED XPC_WARN_RESULT XPC_NONNULL_ALL
 xpc_connection_t
 xpc_dictionary_create_connection(xpc_object_t xdict, const char *key);
 
+__OSX_AVAILABLE_STARTING(__MAC_10_11, __IPHONE_9_0)
+XPC_EXPORT XPC_WARN_RESULT XPC_NONNULL_ALL
+xpc_object_t _Nullable
+xpc_dictionary_get_dictionary(xpc_object_t xdict, const char *key);
+
+XPC_EXPORT
+void* _Nullable
+xpc_dictionary_get_pointer(xpc_object_t xdict, const char* key);
+
+XPC_EXPORT
+void
+xpc_dictionary_set_pointer(xpc_object_t xdict, const char* key, void* value);
+
 #pragma mark Runtime
 /*!
  * @function xpc_main
@@ -2529,6 +2554,16 @@ void
 xpc_set_event_stream_handler(const char *stream, dispatch_queue_t targetq,
 	xpc_handler_t handler);
 #endif // __BLOCKS__ 
+
+#pragma mark XPC Pointer
+
+XPC_EXPORT
+xpc_object_t
+xpc_pointer_create(void* value);
+
+XPC_EXPORT
+void* _Nullable
+xpc_pointer_get_value(xpc_object_t xptr);
 
 __END_DECLS
 
