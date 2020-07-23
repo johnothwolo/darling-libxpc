@@ -545,3 +545,7 @@ void xpc_connection_set_legacy(xpc_connection_t connection) {
 void xpc_connection_set_privileged(xpc_connection_t connection) {
 	puts("STUB: xpc_connection_set_privileged");
 }
+
+void xpc_connection_activate(xpc_connection_t connection) {
+	debugf("XPC STUB: %s\n", __PRETTY_FUNCTION__);
+};
