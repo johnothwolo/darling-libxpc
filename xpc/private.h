@@ -38,6 +38,8 @@ void xpc_dictionary_set_mach_send(xpc_object_t object, const char* key, mach_por
 
 #define XPC_PIPE_FLAG_PRIVILEGED XPC_PIPE_PRIVILEGED
 
+xpc_object_t xpc_connection_copy_entitlement_value(xpc_connection_t connection, const char* entitlement);
+
 #ifdef __cplusplus
 }
 #endif

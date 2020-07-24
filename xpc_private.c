@@ -1,4 +1,5 @@
 #include <xpc/private.h>
+#include <stdio.h>
 
 int _xpc_runtime_is_app_sandboxed()
 {
@@ -174,4 +175,9 @@ xpc_object_t xpc_create_reply_with_format(xpc_object_t original, const char * fo
 	xpc_release(reply);
 
 	return result;
+};
+
+xpc_object_t xpc_connection_copy_entitlement_value(xpc_connection_t connection, const char* entitlement) {
+	printf("%s\n", __PRETTY_FUNCTION__);
+	return NULL;
 };
