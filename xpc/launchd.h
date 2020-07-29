@@ -22,4 +22,6 @@ mach_port_t xpc_dictionary_copy_mach_send(xpc_object_t, const char *);
 xpc_object_t xpc_copy_entitlements_for_pid(pid_t);
 xpc_object_t ld2xpc(launch_data_t);
 
+int launch_activate_socket(const char* key, int** fds, size_t* count);
+
 #endif

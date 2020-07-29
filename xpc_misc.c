@@ -1050,3 +1050,23 @@ xpc_dictionary_set_uuid(xpc_object_t xdict, const char *key, const uuid_t uuid)
 {
 	printf("STUB xpc_dictionary_set_uuid\n");
 }
+
+int launch_activate_socket(const char* key, int** fds, size_t* count) {
+	// notes for someone implementing this in the future:
+	//
+	// this function is used in OpenSSH in ssh-agent.c
+	//
+	// `key` is the socket key in the current process's launchd plist
+	// `fds` is a pointer to an array that we allocate that is freed by the caller
+	// `count` is the size of that array
+	//
+	// implementing this requires looking up the current process's launchd plist
+	// and reading socket values from there (or talking to launchd to do that,
+	// if we can do that; i haven't looked into this much)
+	printf("STUB launch_activate_socket\n");
+	if (fds)
+		*fds = NULL;
+	if (count)
+		*count = 0;
+	return -1;
+};
