@@ -40,6 +40,8 @@ void xpc_dictionary_set_mach_send(xpc_object_t object, const char* key, mach_por
 
 xpc_object_t xpc_connection_copy_entitlement_value(xpc_connection_t connection, const char* entitlement);
 
+void xpc_transaction_exit_clean();
+
 #ifdef __cplusplus
 }
 #endif

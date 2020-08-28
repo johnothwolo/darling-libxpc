@@ -1,5 +1,6 @@
 #include <xpc/private.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 int _xpc_runtime_is_app_sandboxed()
 {
@@ -180,4 +181,12 @@ xpc_object_t xpc_create_reply_with_format(xpc_object_t original, const char * fo
 xpc_object_t xpc_connection_copy_entitlement_value(xpc_connection_t connection, const char* entitlement) {
 	printf("%s\n", __PRETTY_FUNCTION__);
 	return NULL;
+};
+
+// from various notes and comments around its use in WebKit and Security,
+// this function seems to tell the XPC runtime that it's ok for the process
+// to exit once the XPC runtime finishes doing whatever it needs to
+void xpc_transaction_exit_clean() {
+	// for now, we have nothing to do here except exit
+	exit(0);
 };
