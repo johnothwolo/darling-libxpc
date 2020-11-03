@@ -568,6 +568,9 @@ XPC_INLINE struct xpc_object* xpc_unpack(const void* buf, size_t size, size_t* p
 void
 xpc_object_destroy(struct xpc_object *xo)
 {
+	if (xo->xo_refcnt == _XPC_KEEP_ALIVE)
+		return;
+
 	if (xo->xo_xpc_type == _XPC_TYPE_DICTIONARY)
 		xpc_dictionary_destroy(xo);
 
@@ -589,9 +592,10 @@ xpc_object_destroy(struct xpc_object *xo)
 xpc_object_t
 xpc_retain(xpc_object_t obj)
 {
-	struct xpc_object *xo;
+	struct xpc_object *xo = obj;
+	if (xo->xo_refcnt == _XPC_KEEP_ALIVE)
+		return obj;
 
-	xo = obj;
 	OSAtomicIncrement32(&xo->xo_refcnt);
 	return (obj);
 }
@@ -599,9 +603,10 @@ xpc_retain(xpc_object_t obj)
 void
 xpc_release(xpc_object_t obj)
 {
-	struct xpc_object *xo;
+	struct xpc_object *xo = obj;
+	if (xo->xo_refcnt == _XPC_KEEP_ALIVE)
+		return;
 
-	xo = obj;
 	if (OSAtomicDecrement32(&xo->xo_refcnt) > 0)
 		return;
 
@@ -787,8 +792,7 @@ ld2xpc(launch_data_t ld)
 		memcpy(__DECONST(void *, val.str), ld->string, ld->string_len);
 		xo = _xpc_prim_create(ld_to_xpc_type[ld->type], val, ld->string_len);
 	} else if (ld->type == LAUNCH_DATA_BOOL) {
-		val.b = (bool)ld->boolean;
-		xo = _xpc_prim_create(ld_to_xpc_type[ld->type], val, 0);
+		xo = xpc_bool_create((bool)ld->boolean);
 	} else if (ld->type == LAUNCH_DATA_ARRAY) {
 		xo = xpc_array_create(NULL, 0);
 		for (uint64_t i = 0; i < ld->_array_cnt; i++)
@@ -803,19 +807,13 @@ ld2xpc(launch_data_t ld)
 xpc_object_t
 xpc_copy_entitlement_for_token(const char *key __unused, audit_token_t *token __unused)
 {
-	xpc_u val;
-
-	val.b = true;
-	return (_xpc_prim_create(_XPC_TYPE_BOOL, val,0));
+	return xpc_bool_create(true);
 }
 
 xpc_object_t
 xpc_copy_entitlements_for_pid(pid_t pid)
 {
-    xpc_u val;
-
-    val.b = true;
-    return (_xpc_prim_create(_XPC_TYPE_BOOL, val,0));
+	return xpc_bool_create(true);
 }
 
 

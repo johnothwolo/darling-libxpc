@@ -32,7 +32,7 @@ set(xpc_sources
 	subr_sbuf.c
 	xpc_pipe.c
 	reboot3.c
-	transaction_private.c
+	transaction.m
 )
 
 set(DYLIB_INSTALL_NAME "/usr/lib/system/libxpc.dylib")
@@ -49,6 +49,12 @@ add_circular(xpc FAT
 		launch
 		system_info
 		system_dyld
+	UPWARD
+		# break an upward dependency on libobjc
+		# ---
+		# note that we don't actually need to intialize it ourselves by calling `objc_init`;
+		# libSystem guarantees that we'll be initialized after libdispatch, and libdispatch already initializes libobjc
+		objc
 )
 #target_link_libraries(xpc system)
 install(TARGETS xpc DESTINATION libexec/darling/usr/lib/system)

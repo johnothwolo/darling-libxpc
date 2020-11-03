@@ -120,6 +120,8 @@ typedef union {
 } xpc_u;	
 
 
+// indicates that the object should never be released
+#define _XPC_KEEP_ALIVE UINT32_MAX
 #define _XPC_FROM_WIRE 0x1
 struct xpc_object {
 	uint8_t			xo_xpc_type;
@@ -163,6 +165,18 @@ struct xpc_service {
 #define xo_dict xo_u.dict
 #define xo_activity xo_u.activity
 #define xo_connection xo_u.connection
+
+#define _XPC_GLOBAL_OBJECT_INITIALIZER(type, extra_size, union_value) { \
+	.xo_xpc_type = type, \
+	.xo_flags = 0, \
+	.xo_refcnt = _XPC_KEEP_ALIVE, \
+	.xo_size = extra_size, \
+	.xo_u = { \
+		union_value, \
+	}, \
+	.xo_audit_token = NULL, \
+	.xo_link = NULL, \
+}
 
 __private_extern__ struct xpc_object *_xpc_prim_create(int type, xpc_u value,
     size_t size);

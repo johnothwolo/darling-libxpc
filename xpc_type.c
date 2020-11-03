@@ -54,14 +54,19 @@ xt _xpc_type_uuid;
 xt _xpc_type_double;
 xt _xpc_type_pointer;
 
-
 struct _xpc_bool_s {
+	// we have to wrap it in `_xpc_bool_s` because the header defines the variable with that type
+	struct xpc_object xo;
 };
 
-typedef const struct _xpc_bool_s xb;
+const struct _xpc_bool_s _xpc_bool_true = {
+	.xo = _XPC_GLOBAL_OBJECT_INITIALIZER(_XPC_TYPE_BOOL, 0, .b = true),
+};
+const struct _xpc_bool_s _xpc_bool_false = {
+	.xo = _XPC_GLOBAL_OBJECT_INITIALIZER(_XPC_TYPE_BOOL, 0, .b = false),
+};
 
-xb _xpc_bool_true;
-xb _xpc_bool_false;
+const struct xpc_object _xpc_null = _XPC_GLOBAL_OBJECT_INITIALIZER(_XPC_TYPE_NULL, 0, .b = false); // requires a union value, so just set the boolean
 
 static size_t xpc_data_hash(const uint8_t *data, size_t length);
 
@@ -146,32 +151,19 @@ _xpc_prim_create_flags(int type, xpc_u value, size_t size, uint16_t flags)
 xpc_object_t
 xpc_null_create(void)
 {
-	xpc_u val = {0};
-	return _xpc_prim_create(_XPC_TYPE_NULL, val, 0);
+	return &_xpc_null;
 }
 
 xpc_object_t
 xpc_bool_create(bool value)
 {
-	xpc_u val;
-
-	val.b = value;
-	return _xpc_prim_create(_XPC_TYPE_BOOL, val, 1);
+	return value ? XPC_BOOL_TRUE : XPC_BOOL_FALSE;
 }
 
 bool
 xpc_bool_get_value(xpc_object_t xbool)
 {
-	struct xpc_object *xo;
-
-	xo = xbool;
-	if (xo == NULL)
-		return (0);
-
-	if (xo->xo_xpc_type == _XPC_TYPE_BOOL)
-		return (xo->xo_bool);
-
-	return (false);
+	return xbool == XPC_BOOL_FALSE ? false : true;
 }
 
 xpc_object_t
