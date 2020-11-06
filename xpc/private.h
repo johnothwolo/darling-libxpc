@@ -4,6 +4,9 @@
 #include <uuid/uuid.h>
 #include <xpc/xpc.h>
 
+// `notify_client.c` includes `xpc/private.h` and expects it to define `xpc_copy_entitlement_for_token`, which we have in `launchd.h`
+#include <xpc/launchd.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

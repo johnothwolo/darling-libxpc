@@ -3,6 +3,10 @@
 #include <xpc/xpc.h>
 #include <xpc/launchd_defs.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define EXNOERROR	0
 #define EXNOMEM		1
 #define EXINVAL		2
@@ -23,5 +27,9 @@ xpc_object_t xpc_copy_entitlements_for_pid(pid_t);
 xpc_object_t ld2xpc(launch_data_t);
 
 int launch_activate_socket(const char* key, int** fds, size_t* count);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
