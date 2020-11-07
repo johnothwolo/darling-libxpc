@@ -30,6 +30,7 @@
 
 #include <sys/queue.h>
 #include "xpc/xpc.h"
+#include <darling/emulation/simple.h>
 
 #ifdef XPC_DEBUG
 #define debugf(...) 				\
@@ -39,12 +40,7 @@
     	fprintf(stderr, "\n");			\
     } while(0);
 #else
-#define debugf(...) \
-    do { \
-	char buf[512]; \
-	sprintf(buf, "libxpc: " __VA_ARGS__); \
-	lkm_call(0x1028, buf); \
-    } while(0);
+#define debugf(...) __simple_kprintf("libxpc: " __VA_ARGS__)
 #endif
 
 #define _XPC_TYPE_INVALID		0
