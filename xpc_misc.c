@@ -77,7 +77,7 @@ static void xpc_copy_description_level(xpc_object_t obj, struct sbuf *sbuf,
 void
 fail_log(const char *exp)
 {
-	syslog(LOG_ERR, "%s", exp);
+	debugf("%s", exp);
 	//sleep(1);
 	printf("%s", exp);
 	//abort();
@@ -899,10 +899,9 @@ xpc_pipe_send(xpc_object_t xobj, mach_port_t dst, mach_port_t local,
 	return (err);	
 }
 
-#define LOG(...)	\
+#define LOG(msg, ...)	\
 	do {            \
-	syslog(LOG_ERR, "%s:%u: ", __FILE__, __LINE__);	\
-	syslog(LOG_ERR, __VA_ARGS__);					\
+	debugf("%s:%u: " msg, __FILE__, __LINE__,##__VA_ARGS__);	\
 	} while (0)
 
 int
