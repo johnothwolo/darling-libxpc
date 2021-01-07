@@ -28,7 +28,7 @@
 #include <sys/types.h>
 #include <mach/mach.h>
 #include <xpc/launchd.h>
-#include "xpc_internal.h"
+#include <xpc/internal.h>
 #include <assert.h>
 #include <math.h>
 
@@ -40,7 +40,7 @@ xpc_dictionary_create(const char * const *keys, const xpc_object_t *values,
 	size_t i;
 	xpc_u val = {0};
 
-	xo = _xpc_prim_create(_XPC_TYPE_DICTIONARY, val, count);
+	xo = _xpc_prim_create(_XPC_TYPE_DICTIONARY, val, 0);
 	
 	for (i = 0; i < count; i++)
 		xpc_dictionary_set_value(xo, keys[i], values[i]);

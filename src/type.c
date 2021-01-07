@@ -29,7 +29,7 @@
 #include <mach/mach.h>
 #include <xpc/launchd.h>
 #include <sys/fileport.h>
-#include "xpc_internal.h"
+#include <xpc/internal.h>
 
 struct _xpc_type_s {
 };

@@ -28,7 +28,7 @@
 #include <sys/types.h>
 #include <mach/mach.h>
 #include <xpc/launchd.h>
-#include "xpc_internal.h"
+#include <xpc/internal.h>
 
 xpc_object_t
 xpc_array_create(const xpc_object_t *objects, size_t count)

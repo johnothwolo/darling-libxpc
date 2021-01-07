@@ -14,7 +14,7 @@ extern const struct os_transaction_vtable_s OS_OBJECT_CLASS_SYMBOL(os_transactio
 
 struct os_transaction_s {
 	_OS_OBJECT_HEADER(
-		struct os_transaction_vtable_s* os_obj_isa,
+		const struct os_transaction_vtable_s* os_obj_isa,
 		os_obj_ref_cnt,
 		os_obj_xref_cnt
 	);

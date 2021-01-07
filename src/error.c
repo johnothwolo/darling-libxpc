@@ -17,8 +17,8 @@ You should have received a copy of the GNU General Public License
 along with Darling.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "xpc/xpc.h"
-#include "xpc_internal.h"
+#include <xpc/xpc.h>
+#include <xpc/internal.h>
 
 /* The only key for XPC_ERROR_* dictionaries */
 #define _XPC_ERROR_KEY_DESCRIPTION_STR "XPCErrorDescription"

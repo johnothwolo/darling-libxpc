@@ -19,8 +19,8 @@ along with Darling.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <Block.h>
 
-#include "xpc/xpc.h"
-#include "xpc_internal.h"
+#include <xpc/xpc.h>
+#include <xpc/internal.h>
 
 
 const char *XPC_ACTIVITY_INTERVAL = "Interval";

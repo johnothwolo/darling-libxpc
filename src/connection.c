@@ -32,7 +32,7 @@
 #include <machine/atomic.h>
 #include <Block.h>
 #include <libkern/OSAtomic.h>
-#include "xpc_internal.h"
+#include <xpc/internal.h>
 
 #define XPC_CONNECTION_NEXT_ID(conn) (OSAtomicIncrement64(&conn->xc_last_id))
 
@@ -547,5 +547,10 @@ void xpc_connection_set_privileged(xpc_connection_t connection) {
 }
 
 void xpc_connection_activate(xpc_connection_t connection) {
-	debugf("XPC STUB: %s\n", __PRETTY_FUNCTION__);
+	debugf("xpc_connection_activate: %p\n", connection);
+
+	// according to the man page for `xpc_connection_create_mach_service(3)`, a call to `xpc_connection_resume` for a never-before-activated connection
+	// is identical to calling `xpc_connection_activate`, so logically, since we've just been using `xpc_connection_resume` in the past, we can just defer to it here
+	// there's not much documentation for `xpc_connection_activate`, though, but i don't think there's much else to it
+	xpc_connection_resume(connection);
 };

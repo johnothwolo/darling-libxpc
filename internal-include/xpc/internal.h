@@ -29,7 +29,7 @@
 #define	_LIBXPC_XPC_INTERNAL_H
 
 #include <sys/queue.h>
-#include "xpc/xpc.h"
+#include <xpc/xpc.h>
 #include <darling/emulation/simple.h>
 
 #ifdef XPC_DEBUG
