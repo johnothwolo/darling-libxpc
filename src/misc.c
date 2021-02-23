@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <xpc/internal.h>
 #include <libkern/OSByteOrder.h>
+#include <sys/sysctl.h>
 
 #define RECV_BUFFER_SIZE	65536
 
@@ -617,4 +618,36 @@ int launch_activate_socket(const char* key, int** fds, size_t* count) {
 	if (count)
 		*count = 0;
 	return -1;
+};
+
+struct os_system_version {
+	unsigned int major;
+	unsigned int minor;
+	unsigned int patch;
+};
+
+int os_system_version_get_current_version(struct os_system_version* version_info) {
+	char version_string[48] = {0};
+	size_t version_string_length = sizeof(version_string);
+	char* ptr = NULL;
+	int status = 0;
+
+	if ((status = sysctlbyname("kern.osproductversion", version_string, &version_string_length, NULL, 0)) != 0)
+		goto out;
+
+	version_info->major = strtoul(version_string, &ptr, 10);
+	if (*ptr != '\0') {
+		version_info->minor = strtoul(ptr + 1, &ptr, 10);
+		if (*ptr != '\0') {
+			version_info->patch = strtoul(ptr + 1, &ptr, 10);
+		} else {
+			version_info->patch = 0;
+		}
+	} else {
+		version_info->minor = 0;
+		version_info->patch = 0;
+	}
+
+out:
+	return status;
 };

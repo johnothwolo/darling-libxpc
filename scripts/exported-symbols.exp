@@ -281,7 +281,7 @@ _launchd_msg_send
 _load_launchd_jobs_at_loginwindow_prompt
 _mpm_uncork_fork
 _mpm_wait
-#_os_system_version_get_current_version
+_os_system_version_get_current_version
 #_os_system_version_sim_get_current_host_version
 #_os_transaction_copy_description
 _os_transaction_create
