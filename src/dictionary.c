@@ -65,8 +65,14 @@ xpc_dictionary_create_reply(xpc_object_t original)
 	}
 	xo_orig->xo_flags &= ~_XPC_FROM_WIRE;
 
-	// TODO: Apple puts a reference to original into retval
-	return xpc_dictionary_create(NULL, NULL, 0);
+	// possible BUG: i'm not sure if this is how Apple associates the 2 dictionaries or not
+	// if we want to replicate their format exactly, we need to double-check this
+	xpc_object_t new_dict = xpc_dictionary_create(NULL, NULL, 0);
+	xpc_object_t seq_id = xpc_dictionary_get_value(original, XPC_SEQID);
+	if (seq_id != NULL) {
+		xpc_dictionary_set_uint64(new_dict, XPC_SEQID, xpc_uint64_get_value(seq_id));
+	}
+	return new_dict;
 }
 
 void
@@ -133,6 +139,8 @@ xpc_dictionary_set_value(xpc_object_t xdict, const char *key, xpc_object_t value
 
 	TAILQ_FOREACH(pair, head, xo_link) {
 		if (!strcmp(pair->key, key)) {
+			xpc_retain(value);
+			xpc_release(pair->value);
 			pair->value = value;
 			return;
 		}

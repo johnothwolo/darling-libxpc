@@ -68,7 +68,7 @@ xpc_array_set_value(xpc_object_t xarray, size_t index, xpc_object_t value)
 			    xotmp, xo_link);
 			TAILQ_REMOVE(arr, xotmp, xo_link);
 			xpc_retain(value);
-			free(xotmp);
+			xpc_release(xotmp);
 			break;
 		}
 	}

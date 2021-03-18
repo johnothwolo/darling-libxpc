@@ -34,7 +34,11 @@
 #include <libkern/OSAtomic.h>
 #include <xpc/internal.h>
 
-#define XPC_CONNECTION_NEXT_ID(conn) (OSAtomicIncrement64(&conn->xc_last_id))
+static uint64_t generate_message_id(xpc_connection_t conn) {
+	uint64_t num = 0;
+	arc4random_buf(&num, sizeof(num));
+	return num;
+};
 
 static void xpc_connection_recv_message();
 static void xpc_send(xpc_connection_t xconn, xpc_object_t message, uint64_t id);
@@ -63,7 +67,6 @@ xpc_connection_create(const char *name, dispatch_queue_t targetq)
 	conn = conn_extract(rv);
 
 	memset(conn, 0, sizeof(struct xpc_connection));
-	conn->xc_last_id = 1;
 	TAILQ_INIT(&conn->xc_peers);
 	TAILQ_INIT(&conn->xc_pending);
 
@@ -232,13 +235,6 @@ xpc_connection_resume(xpc_connection_t xconn)
 	}
 
 	dispatch_resume(conn->xc_recv_queue);
-	dispatch_async(conn->xc_recv_queue, ^{
-		debugf("Recv queue %p works! #1", conn->xc_recv_queue);
-	});
-	dispatch_async(conn->xc_recv_queue, ^{
-		debugf("Recv queue works! #2");
-	});
-
 }
 
 void
@@ -249,10 +245,13 @@ xpc_connection_send_message(xpc_connection_t xconn,
 	uint64_t id;
 
 	conn = conn_extract(xconn);
-	id = xpc_dictionary_get_uint64(message, XPC_SEQID);
 
-	if (id == 0)
-		id = XPC_CONNECTION_NEXT_ID(conn);
+	xpc_object_t seq_id = xpc_dictionary_get_value(message, XPC_SEQID);
+	if (seq_id) {
+		id = xpc_uint64_get_value(seq_id);
+	} else {
+		id = generate_message_id(xconn);
+	}
 
 	xpc_retain(message);
 	dispatch_async(conn->xc_send_queue, ^{
@@ -267,11 +266,19 @@ xpc_connection_send_message_with_reply(xpc_connection_t xconn,
 {
 	struct xpc_connection *conn;
 	struct xpc_pending_call *call;
+	uint64_t id;
+
+	xpc_object_t seq_id = xpc_dictionary_get_value(message, XPC_SEQID);
+	if (seq_id) {
+		id = xpc_uint64_get_value(seq_id);
+	} else {
+		id = generate_message_id(xconn);
+	}
 
 	conn = conn_extract(xconn);
 	call = malloc(sizeof(struct xpc_pending_call));
-	call->xp_id = XPC_CONNECTION_NEXT_ID(conn);
-	call->xp_handler = handler;
+	call->xp_id = id;
+	call->xp_handler = Block_copy(handler);
 	call->xp_queue = targetq;
 	TAILQ_INSERT_TAIL(&conn->xc_pending, call, xp_link);
 
@@ -410,20 +417,51 @@ xpc_transaction_end(void)
 	vproc_transaction_end(NULL, NULL);
 }
 
+static void xpc_connection_invalidate(xpc_connection_t xconn) {
+	struct xpc_pending_call* call = NULL;
+	struct xpc_connection* conn = conn_extract(xconn);
+	struct xpc_connection* peer = NULL;
+
+	// tell all outstanding waiters that the connection is now invalid
+	while ((call = TAILQ_FIRST(&conn->xc_pending))) {
+		TAILQ_REMOVE(&conn->xc_pending, call, xp_link);
+		if (call->xp_handler) {
+			xpc_handler_t handler = call->xp_handler;
+			dispatch_async(conn->xc_target_queue, ^{
+				handler((xpc_object_t)XPC_ERROR_CONNECTION_INVALID);
+				Block_release(handler);
+			});
+		}
+		free(call);
+	}
+
+	// notify the main event handler
+	if (conn->xc_handler) {
+		dispatch_async(conn->xc_target_queue, ^{
+			conn->xc_handler((xpc_object_t)XPC_ERROR_CONNECTION_INVALID);
+		});
+	}
+};
+
 static void
 xpc_send(xpc_connection_t xconn, xpc_object_t message, uint64_t id)
 {
 	struct xpc_connection *conn;
-	kern_return_t kr;
+	int status;
 
 	debugf("xpc_send(): connection=%p, message=%p (type=%d), id=%d", xconn, message, ((struct xpc_object*) message)->xo_xpc_type, id);
 
 	conn = conn_extract(xconn);
-	kr = xpc_pipe_send(message, conn->xc_remote_port,
+	status = xpc_pipe_send(message, conn->xc_remote_port,
 	    conn->xc_local_port, id);
 
-	if (kr != KERN_SUCCESS)
-		debugf("send failed, kr=%d", kr);
+	if (status != 0) {
+		debugf("send failed, kr=%d", status);
+
+		if (status == -EPIPE) {
+			xpc_connection_invalidate(xconn);
+		}
+	}
 }
 
 static void
@@ -453,21 +491,43 @@ xpc_connection_recv_message(void *context)
 	struct xpc_connection *conn, *peer;
 	xpc_object_t result;
 	mach_port_t remote;
-	kern_return_t kr;
+	int status;
 	uint64_t id;
 
 	debugf("xpc_recv: connection=%p", context);
 
 	conn = context;
-	kr = xpc_pipe_receive(conn->xc_local_port, &remote, &result, &id);
-	if (kr != KERN_SUCCESS)
+	status = xpc_pipe_receive(conn->xc_local_port, &remote, &result, &id);
+	if (status != 0) {
+		if (status == -EPIPE) {
+			xpc_connection_invalidate((xpc_connection_t)conn);
+		}
 		return;
+	}
 
 	debugf("xpc_recv: message=%p, id=%d, remote=<%d>", result, id, remote);
 
 	if (conn->xc_flags & XPC_CONNECTION_MACH_SERVICE_LISTENER) {
 		TAILQ_FOREACH(peer, &conn->xc_peers, xc_link) {
 			if (remote == peer->xc_remote_port) {
+				// first, check if it's a reply to any message with pending replies
+				TAILQ_FOREACH(call, &peer->xc_pending, xp_link) {
+					if (call->xp_id == id) {
+						debugf("Found matching ID, async run handler on queue %p", peer->xc_target_queue);
+						if (call->xp_handler) {
+							dispatch_async(peer->xc_target_queue, ^{
+								debugf("pass to handler");
+								call->xp_handler(result);
+								Block_release(call->xp_handler);
+								TAILQ_REMOVE(&peer->xc_pending, call, xp_link);
+								free(call);
+							});
+						}
+						return;
+					}
+				}
+
+				// otherwise, pass it to the main handler
 				if (peer->xc_handler) {
 					dispatch_async(peer->xc_target_queue, ^{
 						peer->xc_handler(result);
@@ -517,6 +577,7 @@ xpc_connection_recv_message(void *context)
 					dispatch_async(conn->xc_target_queue, ^{
 						debugf("pass to handler");
 						call->xp_handler(result);
+						Block_release(call->xp_handler);
 						TAILQ_REMOVE(&conn->xc_pending, call,
 						    xp_link);
 						free(call);

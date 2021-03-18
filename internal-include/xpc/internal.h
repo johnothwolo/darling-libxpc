@@ -84,7 +84,6 @@ struct xpc_connection {
 	int			xc_suspend_count;
 	int			xc_transaction_count;
 	int 			xc_flags;
-	volatile uint64_t	xc_last_id;
 	void *			xc_context;
 	struct xpc_connection * xc_parent;
 	uid_t			xc_remote_euid;

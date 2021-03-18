@@ -421,20 +421,20 @@ xpc_uuid_get_bytes(xpc_object_t xuuid)
 xpc_type_t
 xpc_get_type(xpc_object_t obj)
 {
-	struct xpc_object *xo;
+	struct xpc_object* xo = obj;
 
-	xo = obj;
+	// temporary hack
+	if (xo->xo_xpc_type == _XPC_TYPE_DICTIONARY && xpc_dictionary_get_value(obj, XPC_ERROR_KEY_DESCRIPTION) != NULL) {
+		return XPC_TYPE_ERROR;
+	}
+
 	return (xpc_typemap[xo->xo_xpc_type]);
 }
 
 bool
 xpc_equal(xpc_object_t x1, xpc_object_t x2)
 {
-	struct xpc_object *xo1, *xo2;
-
-	xo1 = x1;
-	xo2 = x2;
-	return xo1 == xo2;
+	return xpc_hash(x1) == xpc_hash(x2);
 }
 
 static size_t
@@ -489,6 +489,9 @@ xpc_hash(xpc_object_t obj)
 		return (hash);
 	case _XPC_TYPE_POINTER:
 		return ((size_t)xo->xo_u.ptr);
+	case _XPC_TYPE_CONNECTION:
+		// two connections can only be equal if they are the same object (i.e. with the same pointers)
+		return (size_t)obj;
 	default:
 		return 0;
 	}

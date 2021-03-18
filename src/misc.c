@@ -422,14 +422,14 @@ xpc_pipe_send(xpc_object_t xobj, mach_port_t dst, mach_port_t local,
 
 	debugf("packing message");
 	if ((errno = xpc_serialize(xo, NULL, 0, &size)) != 0)
-		return errno;
+		return -errno;
 
 	msg_size = size + sizeof(struct xpc_message);
 	if ((message = malloc(msg_size)) == NULL)
-		return ENOMEM;
+		return -ENOMEM;
 
 	if ((errno = xpc_serialize(xo, message->data, size, NULL)) != 0)
-		return errno;
+		return -errno;
 
 	debugf("sending message");
 	msg_size = ALIGN(size + sizeof(mach_msg_header_t) + sizeof(size_t) + sizeof(uint64_t));
@@ -442,7 +442,7 @@ xpc_pipe_send(xpc_object_t xobj, mach_port_t dst, mach_port_t local,
 	message->size = size;
 	kr = mach_msg_send(&message->header);
 	if (kr != KERN_SUCCESS)
-		err = (kr == KERN_INVALID_TASK) ? EPIPE : EINVAL;
+		err = (kr == KERN_INVALID_TASK || kr == MACH_SEND_INVALID_DEST) ? -EPIPE : -EINVAL;
 	else
 		err = 0;
 	free(message);
@@ -476,8 +476,11 @@ xpc_pipe_receive(mach_port_t local, mach_port_t *remote, xpc_object_t *result,
 	    0, request->msgh_size, request->msgh_local_port,
 	    MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
 
-	if (kr != 0)
+	if (kr != KERN_SUCCESS) {
 		LOG("mach_msg_receive returned %d\n", kr);
+		return (kr == KERN_INVALID_TASK || kr == MACH_RCV_PORT_DIED || kr == MACH_RCV_PORT_CHANGED) ? -EPIPE : -EINVAL;
+	}
+
 	*remote = request->msgh_remote_port;
 	*id = message.id;
 	data_size = (int)message.size;
