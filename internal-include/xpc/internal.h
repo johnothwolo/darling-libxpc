@@ -30,6 +30,7 @@
 
 #include <sys/queue.h>
 #include <xpc/xpc.h>
+#include <xpc/activity.h>
 #include <darling/emulation/simple.h>
 
 #ifdef XPC_DEBUG

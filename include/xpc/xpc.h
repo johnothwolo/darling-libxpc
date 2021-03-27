@@ -380,15 +380,18 @@ __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_5_0)
 XPC_EXPORT XPC_NONNULL1
 void
 xpc_release(xpc_object_t object);
-void
-xpc_release_safe(xpc_object_t object);
 #if OS_OBJECT_USE_OBJC_RETAIN_RELEASE
 #undef xpc_release
 #define xpc_release(object) ({ xpc_object_t _o = (object); \
 		_xpc_object_validate(_o); [_o release]; })
-#define xpc_release_safe(object) xpc_release(object)
 
 #endif // OS_OBJECT_USE_OBJC_RETAIN_RELEASE
+#define xpc_release_safe(object) do { \
+		if (object) { \
+			xpc_release(object); \
+			object = NULL; \
+		} \
+	} while (0);
 
 /*!
  * @function xpc_get_type

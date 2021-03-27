@@ -1,14 +1,9 @@
 project(xpc)
 
-cmake_minimum_required(VERSION 2.4.0)
-enable_language(C ASM)
+cmake_minimum_required(VERSION 3.12)
 
-if(COMMAND cmake_policy)
-	cmake_policy(SET CMP0003 NEW)
-endif(COMMAND cmake_policy)
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse -msse2 -msse3 -w -nostdinc -fblocks")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__DARWIN_UNIX03 -fPIC -w")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse -msse2 -msse3 -nostdinc -fblocks -fvisibility=hidden")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__DARWIN_UNIX03 -fPIC")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -nostdlib")
 
 include_directories(
@@ -16,31 +11,69 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/internal-include
 )
 
-add_definitions(-DMACH)
-
-set(xpc_sources
-	src/activity.c
-	src/array.c
-	src/bsm_wrappers.c
-	src/connection.c
-	src/dictionary.c
-	src/error.c
-	src/init.c
-	src/misc.c
-	src/pipe.c
-	src/private.c
-	src/reboot3.c
-	src/serialization.c
-	src/subr_sbuf.c
-	src/todo.c
-	src/transaction.m
-	src/type.c
+add_compile_definitions(
+	__XPC_BUILDING_XPC__
+	__XPC_PROJECT_BUILD__
 )
 
+add_compile_options(
+	-Wno-extern-initializer
+)
+
+add_compile_options(
+	-include "${CMAKE_CURRENT_SOURCE_DIR}/internal-include/xpc/prefix.h"
+)
+
+set(xpc_sources
+	src/bsm_wrappers.c
+	src/init.c
+	src/reboot3.c
+	src/serialization.c
+
+	src/activity.m
+	src/array.m
+	src/base.m
+	src/bool.m
+	src/bundle.m
+	src/coalition.m
+	src/connection.m
+	src/data.m
+	src/date.m
+	src/dictionary.m
+	src/double.m
+	src/endpoint.m
+	src/error.m
+	src/event.m
+	src/fd.m
+	src/file_transfer.m
+	src/int64.m
+	src/launchd.m
+	src/mach_recv.m
+	src/mach_send.m
+	src/misc.m
+	src/null.m
+	src/pipe.m
+	src/pointer.m
+	src/runtime.m
+	src/serializer.m
+	src/service_instance.m
+	src/service.m
+	src/shmem.m
+	src/string.m
+	src/transaction.m
+	src/type.m
+	src/uint64.m
+	src/uuid.m
+	src/util.m
+)
+
+add_darling_object_library(xpc_obj ${xpc_sources})
+
 set(DYLIB_INSTALL_NAME "/usr/lib/system/libxpc.dylib")
-add_circular(xpc FAT
-	SOURCES
-		${xpc_sources}
+add_circular(xpc
+	FAT
+	OBJECTS
+		$<TARGET_OBJECTS:xpc_obj>
 	SIBLINGS
 		system_c
 		system_kernel
@@ -51,6 +84,8 @@ add_circular(xpc FAT
 		launch
 		system_info
 		system_dyld
+		unwind
+		compiler_rt
 	UPWARD
 		# break an upward dependency on libobjc
 		# ---
@@ -58,10 +93,21 @@ add_circular(xpc FAT
 		# libSystem guarantees that we'll be initialized after libdispatch, and libdispatch already initializes libobjc
 		objc
 )
-#target_link_libraries(xpc system)
+
 install(TARGETS xpc DESTINATION libexec/darling/usr/lib/system)
 
+# NOTE: on macOS, these exported symbols are actually in libxpc itself, and are instead reexported by liblaunch.
+# this difference shouldn't matter in practice
 target_link_options(xpc PRIVATE
-	-Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/scripts/exported-symbols.exp
+	-Wl,-reexported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/scripts/reexported-symbols.exp
 )
 
+if (ENABLE_TESTS)
+	add_darling_static_library(xpc_static
+		FAT
+		SOURCES
+			$<TARGET_OBJECTS:xpc_obj>
+	)
+
+	add_subdirectory(test)
+endif (ENABLE_TESTS)

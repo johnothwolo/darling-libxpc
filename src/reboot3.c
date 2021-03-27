@@ -1,8 +1,10 @@
-#include <stdio.h>
+#import <reboot2.h>
+#import <xpc/xpc.h>
 
-void *reboot3(int howto) {
+XPC_EXPORT
+void *reboot3(uint64_t flags) {
 	/* Let's just call reboot2 */
 	/* It is defined in liblaunch */
 	/* printf("libxpc reboot3 called with howto: %d\n", howto); */
-	return reboot2(howto);
+	return reboot2(flags);
 }
