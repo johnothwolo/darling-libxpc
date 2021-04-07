@@ -8,9 +8,16 @@ XPC_CLASS_DECL(mach_recv);
 
 struct xpc_mach_recv_s {
 	struct xpc_object_s base;
+	mach_port_t port;
 };
 
 @interface XPC_CLASS_INTERFACE(mach_recv)
+
+@property(readonly) mach_port_t port;
+
+- (instancetype)initWithPort: (mach_port_t)port;
+
+- (mach_port_t)extractPort;
 
 @end
 

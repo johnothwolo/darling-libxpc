@@ -11,6 +11,39 @@
 extern "C" {
 #endif
 
+
+XPC_EXPORT
+XPC_TYPE(_xpc_type_mach_send);
+#define XPC_TYPE_MACH_SEND (&_xpc_type_mach_send)
+
+XPC_EXPORT
+XPC_TYPE(_xpc_type_mach_recv);
+#define XPC_TYPE_MACH_RECV (&_xpc_type_mach_recv)
+
+XPC_EXPORT
+XPC_TYPE(_xpc_type_serializer);
+#define XPC_TYPE_SERIALIZER (&_xpc_type_serializer)
+
+XPC_EXPORT
+XPC_TYPE(_xpc_type_pipe);
+#define XPC_TYPE_PIPE (&_xpc_type_pipe)
+
+XPC_EXPORT
+XPC_TYPE(_xpc_type_bundle);
+#define XPC_TYPE_BUNDLE (&_xpc_type_bundle)
+
+XPC_EXPORT
+XPC_TYPE(_xpc_type_service);
+#define XPC_TYPE_SERVICE (&_xpc_type_service)
+
+XPC_EXPORT
+XPC_TYPE(_xpc_type_service_instance);
+#define XPC_TYPE_SERVICE_INSTANCE (&_xpc_type_service_instance)
+
+XPC_EXPORT
+XPC_TYPE(_xpc_type_file_transfer);
+#define XPC_TYPE_FILE_TRANSFER (&_xpc_type_file_transfer)
+
 int _xpc_runtime_is_app_sandboxed();
 
 void xpc_pipe_invalidate(xpc_pipe_t pipe);
@@ -105,6 +138,8 @@ xpc_object_t _xpc_bool_create_distinct(bool value);
 void _xpc_bool_set_value(xpc_object_t xbool, bool value);
 
 const char* xpc_type_get_name(xpc_type_t xtype);
+
+xpc_connection_t xpc_connection_create_listener(const char* name, dispatch_queue_t queue);
 
 #ifdef __cplusplus
 }

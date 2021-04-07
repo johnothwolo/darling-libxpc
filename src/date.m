@@ -2,10 +2,12 @@
 #import <xpc/util.h>
 #import <xpc/xpc.h>
 #import <Foundation/NSDate.h>
+#import <xpc/serialization.h>
 
 #include <time.h>
 
 XPC_WRAPPER_CLASS_IMPL(date, int64_t, "%lld");
+XPC_WRAPPER_CLASS_SERIAL_IMPL(date, int64_t, DATE, U64, uint64_t);
 
 //
 // C API

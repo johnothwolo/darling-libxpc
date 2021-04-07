@@ -18,6 +18,7 @@ add_compile_definitions(
 
 add_compile_options(
 	-Wno-extern-initializer
+	-Werror
 )
 
 add_compile_options(
@@ -28,7 +29,6 @@ set(xpc_sources
 	src/bsm_wrappers.c
 	src/init.c
 	src/reboot3.c
-	src/serialization.c
 
 	src/activity.m
 	src/array.m
@@ -55,7 +55,7 @@ set(xpc_sources
 	src/pipe.m
 	src/pointer.m
 	src/runtime.m
-	src/serializer.m
+	src/serialization.m
 	src/service_instance.m
 	src/service.m
 	src/shmem.m
@@ -86,6 +86,7 @@ add_circular(xpc
 		system_dyld
 		unwind
 		compiler_rt
+		system_pthread
 	UPWARD
 		# break an upward dependency on libobjc
 		# ---

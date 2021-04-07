@@ -1,8 +1,10 @@
 #import <xpc/objects/uint64.h>
 #import <xpc/util.h>
 #import <xpc/xpc.h>
+#import <xpc/serialization.h>
 
 XPC_WRAPPER_CLASS_IMPL(uint64, uint64_t, "%llu");
+XPC_WRAPPER_CLASS_SERIAL_IMPL(uint64, uint64_t, UINT64, U64, uint64_t);
 
 //
 // C API

@@ -8,7 +8,7 @@ XPC_CLASS_DECL(array);
 
 struct xpc_array_s {
 	struct xpc_object_s base;
-	NSUInteger size;
+	unsigned long size; // not NSUInteger or size_t because it needs to be `unsigned long` in 32-bit builds as well
 	XPC_CLASS(object)** array;
 };
 

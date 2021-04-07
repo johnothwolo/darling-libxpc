@@ -1,3 +1,5 @@
+add_subdirectory(launchd-service)
+
 set(TEST_SOURCES
 	array.m
 	base.m

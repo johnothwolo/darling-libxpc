@@ -1,12 +1,13 @@
 #ifndef _XPC_UTIL_H_
 #define _XPC_UTIL_H_
 
+#import <xpc/internal_base.h>
 #import <xpc/objects/base.h>
-#import <xpc/objects/connection.h>
 
 #include <stdlib.h>
 #include <stdbool.h>
 #include <mach/mach.h>
+#include <sys/syslog.h>
 
 /**
  * Defines `objcName` by casting `origName`, but also checks to ensure it's not `nil`
@@ -31,7 +32,7 @@
 /**
  * Like `TO_OBJC_CHECKED`, but the condition checks for failure to pass the checks.
  *
- * @see `TO_OBJC_CHECKED`
+ * @see TO_OBJC_CHECKED
  */
 #define TO_OBJC_CHECKED_ON_FAIL(className, origName, objcName) \
 	XPC_CLASS(className)* objcName = XPC_CAST(className, origName); \
@@ -50,7 +51,7 @@ XPC_CLASS(object)* xpc_retain_for_collection(XPC_CLASS(object)* object);
 /**
  * Special `release` variant for collection classes like dictionaries and arrays.
  *
- * @see `xpc_retain_for_collection`
+ * @see xpc_retain_for_collection
  *
  * @returns The object passed in, possibly with a decreased reference count.
  */
@@ -78,13 +79,184 @@ char* xpc_description_indent(const char* description, bool indentFirstLine);
 size_t xpc_raw_data_hash(const void* data, size_t data_length);
 
 /**
+ * Checks if the given port is dead.
+ */
+bool xpc_mach_port_is_dead(mach_port_t port);
+
+/**
  * Increments the reference count on the given right for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
+ *
+ * @note Certain rights (like receive rights) cannot be retained, only released. This a Mach limitation.
  */
 kern_return_t xpc_mach_port_retain_right(mach_port_name_t port, mach_port_right_t right);
 
 /**
  * Decrements the reference count on the given right for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
  */
 kern_return_t xpc_mach_port_release_right(mach_port_name_t port, mach_port_right_t right);
+
+/**
+ * Increments the reference count on the send right for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
+ */
+kern_return_t xpc_mach_port_retain_send(mach_port_t port);
+
+/**
+ * Decrements the reference count on the send right for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
+ */
+kern_return_t xpc_mach_port_release_send(mach_port_t port);
+
+/**
+ * Creates or retains a send right in the given port.
+ */
+kern_return_t xpc_mach_port_make_send(mach_port_t port);
+
+/**
+ * Increments the reference count on the send-once right for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
+ */
+kern_return_t xpc_mach_port_retain_send_once(mach_port_t port);
+
+/**
+ * Decrements the reference count on the send-once right for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
+ */
+kern_return_t xpc_mach_port_release_send_once(mach_port_t port);
+
+/**
+ * Increments the reference count on all types of send rights (i.e. send and send-once) for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
+ */
+kern_return_t xpc_mach_port_retain_send_any(mach_port_t port);
+
+/**
+ * Decrements the reference count on all types of send rights (i.e. send and send-once) for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
+ */
+kern_return_t xpc_mach_port_release_send_any(mach_port_t port);
+
+/**
+ * Decrements the reference count on the receive right for the given port.
+ *
+ * Works regardless of whether the port is dead or not.
+ *
+ * Can safely be called on `MACH_PORT_NULL` and `MACH_PORT_DEAD`, which will just result in a no-op.
+ *
+ * @note There is no corresponding retain operation for receive ports because Mach limits receive ports to a single reference.
+ */
+kern_return_t xpc_mach_port_release_receive(mach_port_t port);
+
+/**
+ * Maps the given message type name to a port right type.
+ */
+mach_port_right_t xpc_mach_msg_type_name_to_port_right(mach_msg_type_name_t type_name);
+
+/**
+ * Creates a new receive port.
+ */
+mach_port_t xpc_mach_port_create_receive(void);
+
+/**
+ * Creates a new send-receive port.
+ */
+mach_port_t xpc_mach_port_create_send_receive(void);
+
+/**
+ * Checks if the given port contains a send-once right.
+ */
+bool xpc_mach_port_is_send_once(mach_port_t port);
+
+/**
+ * Aborts the current process, with an optional reason.
+ */
+XPC_NORETURN XPC_PRINTF(4, 5)
+void _xpc_abort(const char* function, const char* file, size_t line, const char* reason_format, ...);
+
+/**
+ * @see _xpc_abort
+ */
+XPC_NORETURN XPC_PRINTF(4, 0)
+void _xpc_abortv(const char* function, const char* file, size_t line, const char* reason_format, va_list args);
+
+/**
+ * Aborts the current process, with an optional reason. This macro automatically fills in most of the arguments to `_xpc_abort`.
+ */
+#define xpc_abort(...) _xpc_abort(__PRETTY_FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
+
+/**
+ * @see xpc_abort
+ */
+#define xpc_abortv(...) _xpc_abortv(__PRETTY_FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
+
+/**
+ * Aborts the current process due to a failed assertion.
+ */
+XPC_NORETURN
+void _xpc_assertion_failed(const char* function, const char* file, size_t line, const char* expression);
+
+#if XPC_DEBUG
+	#define xpc_assert(x) do { \
+			if (!(x)) _xpc_assertion_failed(__PRETTY_FUNCTION__, __FILE__, __LINE__, #x);\
+		} while (0)
+#else
+	#define xpc_assert(x)
+#endif
+
+#define XPC_LOG_DEBUG   LOG_DEBUG
+#define XPC_LOG_WARNING LOG_WARNING
+#define XPC_LOG_ERROR   LOG_ERR
+#define XPC_LOG_NOTICE  LOG_NOTICE
+#define XPC_LOG_INFO    LOG_INFO
+
+typedef int xpc_log_priority_t;
+
+/**
+ * Logs a message with the given priority.
+ */
+XPC_PRINTF(5, 6)
+void _xpc_log(const char* function, const char* file, size_t line, xpc_log_priority_t priority, const char* format, ...);
+
+/**
+ * @see _xpc_log
+ */
+XPC_PRINTF(5, 0)
+void _xpc_logv(const char* function, const char* file, size_t line, xpc_log_priority_t priority, const char* format, va_list args);
+
+/**
+ * Logs a message with the given priority. This macro automatically fills in most of the arguments to `_xpc_log`.
+ */
+#define xpc_log(...) _xpc_log(__PRETTY_FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
+
+/**
+ * @see xpc_log
+ */
+#define xpc_logv(...) _xpc_logv(__PRETTY_FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
 
 #endif // _XPC_UTIL_H_

@@ -1,6 +1,7 @@
 #import <xpc/objects/bool.h>
 #import <xpc/util.h>
 #import <xpc/xpc.h>
+#import <xpc/serialization.h>
 
 #undef bool
 
@@ -83,6 +84,66 @@ XPC_CLASS_HEADER(bool);
 	} else {
 		return 0x100b;
 	}
+}
+
+@end
+
+@implementation XPC_CLASS(bool) (XPCSerialization)
+
+- (BOOL)serializable
+{
+	return YES;
+}
+
+- (NSUInteger)serializationLength
+{
+	return xpc_serial_padded_length(sizeof(xpc_serial_type_t)) + xpc_serial_padded_length(sizeof(uint32_t));
+}
+
++ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer
+{
+	XPC_CLASS(bool)* result = nil;
+	xpc_serial_type_t type = XPC_SERIAL_TYPE_INVALID;
+	uint32_t value = 0;
+
+	if (![deserializer readU32: &type]) {
+		goto error_out;
+	}
+	if (type != XPC_SERIAL_TYPE_BOOL) {
+		goto error_out;
+	}
+
+	if (![deserializer readU32: &value]) {
+		goto error_out;
+	}
+
+	result = [[self class] boolForValue: !!value];
+
+	return result;
+
+error_out:
+	if (result != nil) {
+		[result release];
+	}
+	return nil;
+}
+
+- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer
+{
+	XPC_THIS_DECL(bool);
+
+	if (![serializer writeU32: XPC_SERIAL_TYPE_BOOL]) {
+		goto error_out;
+	}
+
+	if (![serializer writeU32: this->value]) {
+		goto error_out;
+	}
+
+	return YES;
+
+error_out:
+	return NO;
 }
 
 @end

@@ -3,7 +3,9 @@
 
 #import <xpc/objects/base.h>
 
+XPC_IGNORE_DUPLICATE_PROTOCOL_PUSH;
 XPC_CLASS_DECL(activity);
+XPC_IGNORE_DUPLICATE_PROTOCOL_POP;
 
 struct xpc_activity_s {
 	struct xpc_object_s base;

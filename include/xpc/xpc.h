@@ -59,7 +59,9 @@ typedef const struct _xpc_type_s * xpc_type_t;
  *
  * See <os/object.h> for details.
  */
+XPC_IGNORE_DUPLICATE_PROTOCOL_PUSH;
 OS_OBJECT_DECL(xpc_object);
+XPC_IGNORE_DUPLICATE_PROTOCOL_POP;
 #ifndef __XPC_PROJECT_BUILD__
 #define XPC_DECL(name) typedef xpc_object_t name##_t
 #endif // __XPC_PROJECT_BUILD__
@@ -74,6 +76,7 @@ _xpc_object_validate(xpc_object_t object) {
 }
 #else // OS_OBJECT_USE_OBJC
 typedef void * xpc_object_t;
+#undef XPC_DECL
 #define XPC_DECL(name) typedef struct _##name##_s * name##_t
 #define XPC_GLOBAL_OBJECT(object) (&(object))
 #define XPC_RETURNS_RETAINED

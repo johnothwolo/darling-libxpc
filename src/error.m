@@ -22,16 +22,16 @@ struct _xpc_dictionary_s {
 		.string = _description, \
 		.freeWhenDone = false \
 	}; \
-	extern struct _xpc_dictionary_s _xpc_error_ ## _name; \
+	extern const struct _xpc_dictionary_s _xpc_error_ ## _name; \
 	struct xpc_dictionary_entry_s _xpc_error_ ## _name ## _entry = { \
 		.link = { \
 			.le_next = NULL, \
-			.le_prev = &LIST_FIRST(&_xpc_error_ ## _name.the_real_thing.base.head), \
+			.le_prev = (struct xpc_dictionary_entry_s**)&LIST_FIRST(&_xpc_error_ ## _name.the_real_thing.base.head), \
 		}, \
 		.object = XPC_CAST(string, &_xpc_error_ ## _name ## _entry_string), \
 		.name = XPCErrorDescriptionKey, \
 	}; \
-	XPC_EXPORT struct _xpc_dictionary_s _xpc_error_ ## _name = { \
+	XPC_EXPORT const struct _xpc_dictionary_s _xpc_error_ ## _name = { \
 		.the_real_thing = { \
 			.base = { \
 				.base = { \

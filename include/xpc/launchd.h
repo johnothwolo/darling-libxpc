@@ -14,7 +14,9 @@ extern "C" {
 #define EXSRCH      3
 #define EXMAX		EXSRCH
 
+XPC_IGNORE_DUPLICATE_PROTOCOL_PUSH;
 XPC_DECL(xpc_pipe);
+XPC_IGNORE_DUPLICATE_PROTOCOL_POP;
 
 const char *xpc_strerror(int error);
 xpc_object_t xpc_copy_entitlement_for_token(const char *, audit_token_t *);

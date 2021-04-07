@@ -8,9 +8,19 @@ XPC_CLASS_DECL(mach_send);
 
 struct xpc_mach_send_s {
 	struct xpc_object_s base;
+	mach_port_t port;
 };
 
 @interface XPC_CLASS_INTERFACE(mach_send)
+
+@property(readonly) mach_port_t port;
+
+- (instancetype)initWithPort: (mach_port_t)port;
+- (instancetype)initWithPortNoCopy: (mach_port_t)port;
+- (instancetype)initWithPort: (mach_port_t)port disposition: (mach_msg_type_name_t)disposition;
+
+- (mach_port_t)extractPort;
+- (mach_port_t)copyPort;
 
 @end
 

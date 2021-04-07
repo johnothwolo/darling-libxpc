@@ -3,6 +3,7 @@
 #define __DISPATCH_INDIRECT__
 #import <dispatch/data_private.h>
 #import <xpc/xpc.h>
+#import <xpc/serialization.h>
 
 XPC_CLASS_SYMBOL_DECL(data);
 
@@ -80,6 +81,79 @@ XPC_CLASS_HEADER(data);
 		return true;
 	});
 	return result;
+}
+
+@end
+
+@implementation XPC_CLASS(data) (XPCSerialization)
+
+- (BOOL)serializable
+{
+	return YES;
+}
+
+- (NSUInteger)serializationLength
+{
+	return xpc_serial_padded_length(sizeof(xpc_serial_type_t)) + xpc_serial_padded_length(sizeof(uint32_t)) + xpc_serial_padded_length(self.length);
+}
+
++ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer
+{
+	XPC_CLASS(data)* result = nil;
+	xpc_serial_type_t type = XPC_SERIAL_TYPE_INVALID;
+	uint32_t length = 0;
+	const void* region = NULL;
+
+	if (![deserializer readU32: &type]) {
+		goto error_out;
+	}
+	if (type != XPC_SERIAL_TYPE_DATA) {
+		goto error_out;
+	}
+
+	if (![deserializer readU32: &length]) {
+		goto error_out;
+	}
+
+	if (![deserializer consume: length region: &region]) {
+		goto error_out;
+	}
+
+	result = [[[self class] alloc] initWithBytes: region length: length];
+
+	return result;
+
+error_out:
+	if (result != nil) {
+		[result release];
+	}
+	return nil;
+}
+
+- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer
+{
+	XPC_THIS_DECL(data);
+	uint32_t length = self.length;
+	void* region = NULL;
+
+	if (![serializer writeU32: XPC_SERIAL_TYPE_DATA]) {
+		goto error_out;
+	}
+
+	if (![serializer writeU32: length]) {
+		goto error_out;
+	}
+
+	if (![serializer reserve: length region: &region]) {
+		goto error_out;
+	}
+
+	[self getBytes: region length: length];
+
+	return YES;
+
+error_out:
+	return NO;
 }
 
 @end

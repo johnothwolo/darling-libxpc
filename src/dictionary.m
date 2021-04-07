@@ -6,6 +6,10 @@
 #import <xpc/objects/mach_send.h>
 #import <xpc/objects/mach_recv.h>
 #import <xpc/objects/array.h>
+#import <xpc/objects/null.h>
+#import <xpc/objects/connection.h>
+#import <xpc/serialization.h>
+#import <objc/runtime.h>
 
 XPC_CLASS_SYMBOL_DECL(dictionary);
 
@@ -71,6 +75,40 @@ XPC_CLASS_HEADER(dictionary);
 	return output;
 }
 
+- (mach_port_t)incomingPort
+{
+	XPC_THIS_DECL(dictionary);
+	return this->incoming_port;
+}
+
+- (void)setIncomingPort: (mach_port_t)incomingPort
+{
+	XPC_THIS_DECL(dictionary);
+	this->incoming_port = incomingPort;
+}
+
+- (mach_port_t)outgoingPort
+{
+	XPC_THIS_DECL(dictionary);
+	return this->outgoing_port;
+}
+
+- (void)setOutgoingPort: (mach_port_t)outgoingPort
+{
+	XPC_THIS_DECL(dictionary);
+	this->outgoing_port = outgoingPort;
+}
+
+- (BOOL)expectsReply
+{
+	return xpc_mach_port_is_send_once(self.incomingPort);
+}
+
+- (BOOL)isReply
+{
+	return xpc_mach_port_is_send_once(self.outgoingPort);
+}
+
 - (instancetype)init
 {
 	if (self = [super init]) {
@@ -130,15 +168,13 @@ XPC_CLASS_HEADER(dictionary);
 - (XPC_CLASS(connection)*)associatedConnection
 {
 	XPC_THIS_DECL(dictionary);
-	return this->associatedConnection;
+	return objc_loadWeak(&this->associatedConnection);
 }
 
 - (void)setAssociatedConnection: (XPC_CLASS(connection)*)associatedConnection
 {
 	XPC_THIS_DECL(dictionary);
-	XPC_CLASS(connection)* old = this->associatedConnection;
-	this->associatedConnection = [associatedConnection retain];
-	[old release];
+	objc_storeWeak(&this->associatedConnection, associatedConnection);
 }
 
 - (XPC_CLASS(object)*)objectForKey: (const char*)key
@@ -245,6 +281,132 @@ XPC_CLASS_HEADER(dictionary);
 
 @end
 
+@implementation XPC_CLASS(dictionary) (XPCSerialization)
+
+- (BOOL)serializable
+{
+	return YES;
+}
+
+- (NSUInteger)serializationLength
+{
+	XPC_THIS_DECL(dictionary);
+	NSUInteger total = 0;
+	xpc_dictionary_entry_t entry = NULL;
+
+	total += xpc_serial_padded_length(sizeof(xpc_serial_type_t));
+	total += xpc_serial_padded_length(sizeof(uint32_t));
+	total += xpc_serial_padded_length(sizeof(uint32_t));
+
+	LIST_FOREACH(entry, &this->head, link) {
+		XPC_CLASS(object)* object = entry->object;
+		if (!object.serializable) {
+			object = [XPC_CLASS(null) null];
+		}
+		total += xpc_serial_padded_length(strlen(entry->name) + 1);
+		total += object.serializationLength;
+	}
+
+	return total;
+}
+
++ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer
+{
+	XPC_CLASS(dictionary)* result = nil;
+	xpc_serial_type_t type = XPC_SERIAL_TYPE_INVALID;
+	uint32_t contentLength = 0;
+	uint32_t entryCount = 0;
+	NSUInteger contentStartOffset = 0;
+
+	if (![deserializer readU32: &type]) {
+		goto error_out;
+	}
+	if (type != XPC_SERIAL_TYPE_DICT) {
+		goto error_out;
+	}
+
+	if (![deserializer readU32: &contentLength]) {
+		goto error_out;
+	}
+
+	if (![deserializer readU32: &entryCount]) {
+		goto error_out;
+	}
+
+	contentStartOffset = deserializer.offset;
+
+	result = [[[self class] alloc] initWithObjects: NULL forKeys: NULL count: 0];
+
+	for (uint32_t i = 0; i < entryCount; ++i) {
+		const char* key = NULL;
+		XPC_CLASS(object)* object = nil;
+		if (![deserializer readString: &key]) {
+			goto error_out;
+		}
+		if (![deserializer readObject: &object]) {
+			goto error_out;
+		}
+		[result setObject: object forKey: key];
+		[object release];
+	}
+
+	if (deserializer.offset - contentStartOffset != contentLength) {
+		goto error_out;
+	}
+
+	return result;
+
+error_out:
+	if (result != nil) {
+		[result release];
+	}
+	return nil;
+}
+
+- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer
+{
+	XPC_THIS_DECL(dictionary);
+	void* reservedForContentLength = NULL;
+	NSUInteger contentStartOffset = 0;
+	xpc_dictionary_entry_t entry = NULL;
+
+	if (![serializer writeU32: XPC_SERIAL_TYPE_DICT]) {
+		goto error_out;
+	}
+
+	if (![serializer reserve: sizeof(uint32_t) region: &reservedForContentLength]) {
+		goto error_out;
+	}
+
+	if (![serializer writeU32: this->size]) {
+		goto error_out;
+	}
+
+	contentStartOffset = serializer.offset;
+
+	LIST_FOREACH(entry, &this->head, link) {
+		if (![serializer writeString: entry->name]) {
+			goto error_out;
+		}
+		XPC_CLASS(object)* object = entry->object;
+		if (!object.serializable) {
+			object = [XPC_CLASS(null) null];
+		}
+		if (![serializer writeObject: object]) {
+			goto error_out;
+		}
+	}
+
+	OSWriteLittleInt32(reservedForContentLength, 0, serializer.offset - contentStartOffset);
+
+	return YES;
+
+error_out:
+	return NO;
+}
+
+@end
+
 //
 // C API
 //
@@ -255,8 +417,21 @@ xpc_object_t xpc_dictionary_create(const char* const* keys, const xpc_object_t* 
 };
 
 XPC_EXPORT
-xpc_object_t xpc_dictionary_create_reply(xpc_object_t original) {
-	// TODO
+xpc_object_t xpc_dictionary_create_reply(xpc_object_t xorig) {
+	TO_OBJC_CHECKED(dictionary, xorig, orig) {
+		XPC_CLASS(dictionary)* dict = NULL;
+
+		if (!orig.expectsReply) {
+			return NULL;
+		}
+
+		dict = [XPC_CLASS(dictionary) new];
+
+		dict.outgoingPort = orig.incomingPort;
+		orig.incomingPort = MACH_PORT_NULL;
+
+		return dict;
+	}
 	return NULL;
 };
 
@@ -316,7 +491,9 @@ void xpc_dictionary_get_audit_token(xpc_object_t xdict, audit_token_t* token) {
 
 XPC_EXPORT
 xpc_object_t _xpc_dictionary_create_reply_with_port(mach_port_t port) {
-	return NULL;
+	XPC_CLASS(dictionary)* dict = [XPC_CLASS(dictionary) new];
+	dict.incomingPort = port;
+	return dict;
 };
 
 XPC_EXPORT
@@ -336,7 +513,11 @@ mach_msg_id_t _xpc_dictionary_get_reply_msg_id(xpc_object_t xdict) {
 
 XPC_EXPORT
 void _xpc_dictionary_set_remote_connection(xpc_object_t xdict, xpc_connection_t xconn) {
-
+	TO_OBJC_CHECKED(dictionary, xdict, dict) {
+		TO_OBJC_CHECKED(connection, xconn, conn) {
+			dict.associatedConnection = conn;
+		}
+	}
 };
 
 XPC_EXPORT
@@ -361,6 +542,9 @@ char* xpc_dictionary_copy_basic_description(xpc_object_t xdict) {
 
 XPC_EXPORT
 bool xpc_dictionary_expects_reply(xpc_object_t xdict) {
+	TO_OBJC_CHECKED(dictionary, xdict, dict) {
+		return dict.expectsReply;
+	}
 	return false;
 };
 

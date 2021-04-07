@@ -1,6 +1,7 @@
 #import <xpc/objects/uuid.h>
 #import <xpc/util.h>
 #import <xpc/xpc.h>
+#import <xpc/serialization.h>
 
 #define UUID_STRING_LENGTH 36
 
@@ -39,6 +40,66 @@ XPC_CLASS_HEADER(uuid);
 {
 	XPC_THIS_DECL(uuid);
 	return xpc_raw_data_hash(this->value, sizeof(this->value));
+}
+
+@end
+
+@implementation XPC_CLASS(uuid) (XPCSerialization)
+
+- (BOOL)serializable
+{
+	return YES;
+}
+
+- (NSUInteger)serializationLength
+{
+	return xpc_serial_padded_length(sizeof(xpc_serial_type_t)) + xpc_serial_padded_length(sizeof(uuid_t));
+}
+
++ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer
+{
+	XPC_CLASS(uuid)* result = nil;
+	xpc_serial_type_t type = XPC_SERIAL_TYPE_INVALID;
+	const uint8_t* bytes = NULL;
+
+	if (![deserializer readU32: &type]) {
+		goto error_out;
+	}
+	if (type != XPC_SERIAL_TYPE_UUID) {
+		goto error_out;
+	}
+
+	if (![deserializer consume: sizeof(uuid_t) region: (const void**)&bytes]) {
+		goto error_out;
+	}
+
+	result = [[[self class] alloc] initWithBytes: bytes];
+
+	return result;
+
+error_out:
+	if (result != nil) {
+		[result release];
+	}
+	return nil;
+}
+
+- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer
+{
+	XPC_THIS_DECL(uuid);
+
+	if (![serializer writeU32: XPC_SERIAL_TYPE_UUID]) {
+		goto error_out;
+	}
+
+	if (![serializer write: this->value length: sizeof(this->value)]) {
+		goto error_out;
+	}
+
+	return YES;
+
+error_out:
+	return NO;
 }
 
 @end

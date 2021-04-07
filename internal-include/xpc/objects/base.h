@@ -3,13 +3,14 @@
 
 #import <os/object_private.h>
 #import <objc/NSObject.h>
-
-#ifndef __XPC_INDIRECT__
-OS_OBJECT_DECL(xpc_object);
-#endif
+#import <xpc/internal_base.h>
 
 #define __XPC_INDIRECT__
 #import <xpc/base.h>
+
+XPC_IGNORE_DUPLICATE_PROTOCOL_PUSH;
+OS_OBJECT_DECL(xpc_object);
+XPC_IGNORE_DUPLICATE_PROTOCOL_POP;
 
 #define XPC_CLASS(name) OS_OBJECT_CLASS(xpc_ ## name)
 
@@ -21,7 +22,7 @@ OS_OBJECT_DECL(xpc_object);
 
 #define XPC_CLASS_HEADER(name) \
 	OS_OBJECT_NONLAZY_CLASS_LOAD \
-	+ (NSUInteger)_instanceSize \
+	+ (NSUInteger)instanceSize \
 	{ \
 		return sizeof(struct xpc_ ## name ## _s); \
 	}
@@ -76,6 +77,53 @@ OS_OBJECT_DECL(xpc_object);
 	} \
 	@end
 
+#define XPC_WRAPPER_CLASS_SERIAL_IMPL(name, type, serial_type, serial_U32_or_U64, serial_uint32_t_or_uint64_t) \
+	@implementation XPC_CLASS(name) (XPCSerialization) \
+	- (BOOL)serializable \
+	{ \
+		return YES; \
+	} \
+	- (NSUInteger)serializationLength \
+	{ \
+		return xpc_serial_padded_length(sizeof(xpc_serial_type_t)) + xpc_serial_padded_length(sizeof(serial_uint32_t_or_uint64_t)); \
+	} \
+	+ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer \
+	{ \
+		XPC_CLASS(name)* result = nil; \
+		xpc_serial_type_t inputType = XPC_SERIAL_TYPE_INVALID; \
+		serial_uint32_t_or_uint64_t value = 0; \
+		if (![deserializer readU32: &inputType]) { \
+			goto error_out; \
+		} \
+		if (inputType != XPC_SERIAL_TYPE_ ## serial_type) { \
+			goto error_out; \
+		} \
+		if (![deserializer read ## serial_U32_or_U64: &value]) { \
+			goto error_out; \
+		} \
+		result = [[[self class] alloc] initWithValue: (type)value]; \
+		return result; \
+	error_out: \
+		if (result != nil) { \
+			[result release]; \
+		} \
+		return nil; \
+	} \
+	- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer \
+	{ \
+		XPC_THIS_DECL(name); \
+		if (![serializer writeU32: XPC_SERIAL_TYPE_ ## serial_type]) { \
+			goto error_out; \
+		} \
+		if (![serializer write ## serial_U32_or_U64: (serial_uint32_t_or_uint64_t)this->value]) { \
+			goto error_out; \
+		} \
+		return YES; \
+	error_out: \
+		return NO; \
+	} \
+	@end
+
 // hack to create symbol aliases programmatically, because the `alias` attribute isn't supported on Darwin platforms
 #define _CREATE_ALIAS(original, alias) __asm__(".globl " original "; .globl " alias "; .equiv " alias ", " original)
 
@@ -110,10 +158,27 @@ struct xpc_object_s {
 XPC_EXPORT
 @interface XPC_CLASS(object) : OS_OBJECT_CLASS(object) <XPC_CLASS(object)>
 
-+ (NSUInteger)_instanceSize;
+@property(readonly, class) NSUInteger instanceSize;
 
 // note that this method returns a string that must be freed
 - (char*)xpcDescription;
+
+@end
+
+@class XPC_CLASS(serializer);
+@class XPC_CLASS(deserializer);
+
+@interface XPC_CLASS(object) (XPCSerialization)
+
+@property(readonly) BOOL serializable;
+
+// NOTE for implementations: this length MUST include any padding that might be added.
+// use `xpc_serial_padded_length` for each component of the serialization.
+@property(readonly) NSUInteger serializationLength;
+
++ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer;
+
+- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer;
 
 @end
 

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>org.darlinghq.libxpc.test-service</string>
+	<key>Program</key>
+	<string>/usr/libexec/libxpc_test_server</string>
+	<key>MachServices</key>
+	<dict>
+		<key>org.darlinghq.libxpc.test-service</key>
+		<true/>
+	</dict>
+	<!-- redirect output to a logfile because launchd's stdout output is messed up (incorrect line breaks) -->
+	<key>StandardOutPath</key>
+	<string>/var/log/libxpc_test_service.log</string>
+</dict>
+</plist>

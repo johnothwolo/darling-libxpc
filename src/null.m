@@ -1,6 +1,7 @@
 #import <xpc/objects/null.h>
 #import <xpc/util.h>
 #import <xpc/xpc.h>
+#import <xpc/serialization.h>
 
 XPC_CLASS_SYMBOL_DECL(null);
 
@@ -29,7 +30,47 @@ XPC_CLASS_HEADER(null);
 
 - (NSUInteger)hash
 {
+#if __LP64__
 	return 0x804201026298ULL;
+#else
+	return 0x8042010U;
+#endif
+}
+
+@end
+
+@implementation XPC_CLASS(null) (XPCSerialization)
+
+- (BOOL)serializable
+{
+	return YES;
+}
+
+- (NSUInteger)serializationLength
+{
+	return xpc_serial_padded_length(sizeof(xpc_serial_type_t));
+}
+
++ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer
+{
+	xpc_serial_type_t type = XPC_SERIAL_TYPE_INVALID;
+
+	if (![deserializer readU32: &type]) {
+		goto error_out;
+	}
+	if (type != XPC_SERIAL_TYPE_NULL) {
+		goto error_out;
+	}
+
+	return [[self class] null];
+
+error_out:
+	return nil;
+}
+
+- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer
+{
+	return [serializer writeU32: XPC_SERIAL_TYPE_NULL];
 }
 
 @end

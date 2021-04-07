@@ -1,8 +1,10 @@
 #import <xpc/objects/pointer.h>
 #import <xpc/util.h>
 #import <xpc/xpc.h>
+#import <xpc/serialization.h>
 
 XPC_WRAPPER_CLASS_IMPL(pointer, void*, "%p");
+XPC_WRAPPER_CLASS_SERIAL_IMPL(pointer, void*, POINTER, U64, uint64_t);
 
 //
 // C API

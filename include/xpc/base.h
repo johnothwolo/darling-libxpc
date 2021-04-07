@@ -162,6 +162,17 @@ __BEGIN_DECLS
 #define XPC_UNAVAILABLE(m)
 #endif // __GNUC__ 
 
+#if __STDC_VERSION__ >= 199901
+	#define XPC_IGNORE_DUPLICATE_PROTOCOL_PUSH \
+		_Pragma("GCC diagnostic push") \
+		_Pragma("GCC diagnostic ignored \"-Wduplicate-protocol\"")
+	#define XPC_IGNORE_DUPLICATE_PROTOCOL_POP \
+		_Pragma("GCC diagnostic pop")
+#else
+	#define XPC_IGNORE_DUPLICATE_PROTOCOL_PUSH
+	#define XPC_IGNORE_DUPLICATE_PROTOCOL_POP
+#endif
+
 __END_DECLS
 
 #endif // __XPC_BASE_H__ 

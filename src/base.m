@@ -3,6 +3,7 @@
 #import <Foundation/NSString.h>
 #import <objc/runtime.h>
 #import <xpc/xpc.h>
+#import <xpc/serialization.h>
 
 // the symbol alias for the base xpc_object class is named differently
 XPC_EXPORT struct objc_class _xpc_type_base;
@@ -15,15 +16,18 @@ XPC_CLASS_HEADER(object);
 
 + (instancetype)allocWithZone: (NSZone*)zone
 {
-	return (id)_os_object_alloc_realized([self class], [self _instanceSize]);
+	return (id)_os_object_alloc_realized([self class], [self instanceSize]);
 }
 
+_Pragma("GCC diagnostic push");
+_Pragma("GCC diagnostic ignored \"-Wobjc-designated-initializers\"");
 - (instancetype)init
 {
 	// we CANNOT call `-[super init]`.
 	// libdispatch makes `init` crash on `OS_object`s.
 	return self;
 }
+_Pragma("GCC diagnostic pop");
 
 - (char*)xpcDescription
 {
@@ -53,6 +57,30 @@ XPC_CLASS_HEADER(object);
 - (instancetype)copy
 {
 	return [self retain];
+}
+
+@end
+
+@implementation XPC_CLASS(object) (XPCSerialization)
+
+- (BOOL)serializable
+{
+	return NO;
+}
+
+- (NSUInteger)serializationLength
+{
+	return 0;
+}
+
++ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer
+{
+	return nil;
+}
+
+- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer
+{
+	return NO;
 }
 
 @end

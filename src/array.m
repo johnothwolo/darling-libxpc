@@ -4,6 +4,8 @@
 #import <xpc/connection.h>
 #import <xpc/objects/mach_send.h>
 #import <xpc/objects/dictionary.h>
+#import <xpc/serialization.h>
+#import <xpc/objects/null.h>
 
 XPC_CLASS_SYMBOL_DECL(array);
 
@@ -200,6 +202,122 @@ XPC_CLASS_HEADER(array);
 	}
 
 	return result;
+}
+
+@end
+
+@implementation XPC_CLASS(array) (XPCSerialization)
+
+- (BOOL)serializable
+{
+	return YES;
+}
+
+- (NSUInteger)serializationLength
+{
+	XPC_THIS_DECL(array);
+	NSUInteger total = 0;
+
+	total += xpc_serial_padded_length(sizeof(xpc_serial_type_t));
+	total += xpc_serial_padded_length(sizeof(uint32_t));
+	total += xpc_serial_padded_length(sizeof(uint32_t));
+
+	for (NSUInteger i = 0; i < this->size; ++i) {
+		XPC_CLASS(object)* object = this->array[i];
+		if (!object.serializable) {
+			object = [XPC_CLASS(null) null];
+		}
+		total += object.serializationLength;
+	}
+
+	return total;
+}
+
++ (instancetype)deserialize: (XPC_CLASS(deserializer)*)deserializer
+{
+	XPC_CLASS(array)* result = nil;
+	xpc_serial_type_t type = XPC_SERIAL_TYPE_INVALID;
+	uint32_t contentLength = 0;
+	uint32_t entryCount = 0;
+	NSUInteger contentStartOffset = 0;
+
+	if (![deserializer readU32: &type]) {
+		goto error_out;
+	}
+	if (type != XPC_SERIAL_TYPE_ARRAY) {
+		goto error_out;
+	}
+
+	if (![deserializer readU32: &contentLength]) {
+		goto error_out;
+	}
+
+	if (![deserializer readU32: &entryCount]) {
+		goto error_out;
+	}
+
+	contentStartOffset = deserializer.offset;
+
+	result = [[[self class] alloc] initWithObjects: NULL count: 0];
+
+	for (uint32_t i = 0; i < entryCount; ++i) {
+		XPC_CLASS(object)* object = nil;
+		if (![deserializer readObject: &object]) {
+			goto error_out;
+		}
+		[result addObject: object];
+		[object release];
+	}
+
+	if (deserializer.offset - contentStartOffset != contentLength) {
+		goto error_out;
+	}
+
+	return result;
+
+error_out:
+	if (result != nil) {
+		[result release];
+	}
+	return nil;
+}
+
+- (BOOL)serialize: (XPC_CLASS(serializer)*)serializer
+{
+	XPC_THIS_DECL(array);
+	void* reservedForContentLength = NULL;
+	NSUInteger contentStartOffset = 0;
+
+	if (![serializer writeU32: XPC_SERIAL_TYPE_ARRAY]) {
+		goto error_out;
+	}
+
+	if (![serializer reserve: sizeof(uint32_t) region: &reservedForContentLength]) {
+		goto error_out;
+	}
+
+	if (![serializer writeU32: this->size]) {
+		goto error_out;
+	}
+
+	contentStartOffset = serializer.offset;
+
+	for (NSUInteger i = 0; i < this->size; ++i) {
+		XPC_CLASS(object)* object = this->array[i];
+		if (!object.serializable) {
+			object = [XPC_CLASS(null) null];
+		}
+		if (![serializer writeObject: object]) {
+			goto error_out;
+		}
+	}
+
+	OSWriteLittleInt32(reservedForContentLength, 0, serializer.offset - contentStartOffset);
+
+	return YES;
+
+error_out:
+	return NO;
 }
 
 @end
