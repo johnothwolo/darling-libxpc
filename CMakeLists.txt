@@ -18,7 +18,6 @@ add_compile_definitions(
 
 add_compile_options(
 	-Wno-extern-initializer
-	-Werror
 )
 
 add_compile_options(
