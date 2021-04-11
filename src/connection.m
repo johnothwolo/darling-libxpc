@@ -125,6 +125,15 @@ static bool handle_send_result(dispatch_mach_msg_t message, dispatch_mach_reason
 	return false;
 };
 
+static audit_token_t* get_audit_token(mach_msg_header_t* header) {
+	audit_token_t* token = NULL;
+	mach_msg_trailer_t* trailer = (mach_msg_trailer_t *)((char*)header + round_msg(header->msgh_size));
+	if (trailer->msgh_trailer_type == MACH_MSG_TRAILER_FORMAT_0 && trailer->msgh_trailer_size >= sizeof(mach_msg_audit_trailer_t)) {
+		token = &((mach_msg_audit_trailer_t*)trailer)->msgh_audit;
+	}
+	return token;
+};
+
 static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, dispatch_mach_msg_t message, mach_error_t error) {
 	XPC_CLASS(connection)* self = context;
 	XPC_THIS_DECL(connection);
@@ -140,12 +149,15 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 				mach_port_t sendPort = MACH_PORT_NULL;
 				mach_port_t receivePort = MACH_PORT_NULL;
 				XPC_CLASS(connection)* serverPeer = nil;
+				audit_token_t* token = NULL;
 
 				if (header->msgh_id != XPC_MSGH_ID_CHECKIN) {
 					xpc_log(XPC_LOG_NOTICE, "server connection received non-checkin message");
 					mach_msg_destroy(header);
 					return;
 				}
+
+				token = get_audit_token(header);
 
 				[message retain]; // because the deserializer consumes a reference on the message
 				deserializer = [[[XPC_CLASS(deserializer) alloc] initWithoutHeaderWithMessage: message] autorelease];
@@ -165,16 +177,26 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 				}
 
 				serverPeer = [[XPC_CLASS(connection) alloc] initAsServerPeerForServer: self sendPort: sendPort receivePort: receivePort];
+				if (token) {
+					[serverPeer setRemoteCredentials: token];
+				}
 				[self addServerPeer: serverPeer]; // takes ownership of the server peer connection
 
 				this->event_handler(serverPeer);
 			} else {
 				XPC_CLASS(dictionary)* dict = nil;
+				audit_token_t* token = NULL;
 
 				if (header->msgh_id != XPC_MSGH_ID_MESSAGE) {
 					xpc_log(XPC_LOG_NOTICE, "peer connection received non-normal message in normal event handler");
 					mach_msg_destroy(header);
 					return;
+				}
+
+				token = get_audit_token(header);
+
+				if (token) {
+					[self setRemoteCredentials: token];
 				}
 
 				[message retain]; // because the deserializer consumes a reference on the message
@@ -306,11 +328,18 @@ static void dmxh_async_reply_handler(void* self_context, dispatch_mach_reason_t 
 	xpc_object_t result = NULL;
 	mach_msg_header_t* header = dispatch_mach_msg_get_msg(message, NULL);
 	mach_port_t localPort = header->msgh_local_port;
+	audit_token_t* token = NULL;
 
 	xpc_log(XPC_LOG_DEBUG, "connection %p: async reply handler got event %lu (%s)\n", self, reason, reason_to_string(reason));
 
 	switch (reason) {
 		case DISPATCH_MACH_MESSAGE_RECEIVED: {
+			token = get_audit_token(header);
+
+			if (token) {
+				[self setRemoteCredentials: token];
+			}
+
 			[message retain]; // because the deserializer consumes a reference on the message
 			result = [XPC_CLASS(deserializer) process: message];
 			if (!result) {
@@ -480,6 +509,7 @@ OS_OBJECT_USES_XREF_DISPOSE();
 
 	pthread_rwlock_destroy(&this->activated_lock);
 	pthread_rwlock_destroy(&this->server_peers_lock);
+	pthread_rwlock_destroy(&this->remote_credentials_lock);
 
 	xpc_mach_port_release_send(this->send_port);
 	xpc_mach_port_release_send(this->checkin_port);
@@ -511,10 +541,16 @@ OS_OBJECT_USES_XREF_DISPOSE();
 
 	pthread_rwlock_init(&this->activated_lock, NULL);
 	pthread_rwlock_init(&this->server_peers_lock, NULL);
+	pthread_rwlock_init(&this->remote_credentials_lock, NULL);
 
 	this->suspension_count = 1;
 
 	xpc_genarr_connection_init(&this->server_peers, true, server_peer_array_item_dtor);
+
+	// fill it with invalid values
+	// the default value of 0 can lead to false positives of root access
+	// (this doesn't matter so much for Darling, but we'll do it anyways)
+	memset(&this->remote_credentials, 0xff, sizeof(audit_token_t));
 }
 
 // init helper/common init
@@ -905,6 +941,22 @@ error_out:
 	return result;
 }
 
+- (void)setRemoteCredentials: (audit_token_t*)token
+{
+	XPC_THIS_DECL(connection);
+	pthread_rwlock_wrlock(&this->remote_credentials_lock);
+	memcpy(&this->remote_credentials, token, sizeof(audit_token_t));
+	pthread_rwlock_unlock(&this->remote_credentials_lock);
+}
+
+- (void)copyRemoteCredentials: (audit_token_t*)outToken
+{
+	XPC_THIS_DECL(connection);
+	pthread_rwlock_rdlock(&this->remote_credentials_lock);
+	memcpy(outToken, &this->remote_credentials, sizeof(audit_token_t));
+	pthread_rwlock_unlock(&this->remote_credentials_lock);
+}
+
 @end
 
 //
@@ -1011,27 +1063,53 @@ const char* xpc_connection_get_name(xpc_connection_t xconn) {
 	return NULL;
 };
 
+void audit_token_to_au32(audit_token_t atoken, uid_t* auidp, uid_t* euidp, gid_t* egidp, uid_t* ruidp, gid_t* rgidp, pid_t* pidp, au_asid_t* asidp, au_tid_t* tidp);
+
 XPC_EXPORT
 uid_t xpc_connection_get_euid(xpc_connection_t xconn) {
-	xpc_stub();
+	TO_OBJC_CHECKED(connection, xconn, conn) {
+		audit_token_t token;
+		uid_t euid;
+		[conn copyRemoteCredentials: &token];
+		audit_token_to_au32(token, NULL, &euid, NULL, NULL, NULL, NULL, NULL, NULL);
+		return euid;
+	}
 	return UID_MAX;
 };
 
 XPC_EXPORT
 gid_t xpc_connection_get_egid(xpc_connection_t xconn) {
-	xpc_stub();
+	TO_OBJC_CHECKED(connection, xconn, conn) {
+		audit_token_t token;
+		gid_t egid;
+		[conn copyRemoteCredentials: &token];
+		audit_token_to_au32(token, NULL, NULL, &egid, NULL, NULL, NULL, NULL, NULL);
+		return egid;
+	}
 	return GID_MAX;
 };
 
 XPC_EXPORT
 pid_t xpc_connection_get_pid(xpc_connection_t xconn) {
-	xpc_stub();
+	TO_OBJC_CHECKED(connection, xconn, conn) {
+		audit_token_t token;
+		pid_t pid;
+		[conn copyRemoteCredentials: &token];
+		audit_token_to_au32(token, NULL, NULL, NULL, NULL, NULL, &pid, NULL, NULL);
+		return pid;
+	}
 	return -1;
 };
 
 XPC_EXPORT
 au_asid_t xpc_connection_get_asid(xpc_connection_t xconn) {
-	xpc_stub();
+	TO_OBJC_CHECKED(connection, xconn, conn) {
+		audit_token_t token;
+		au_asid_t asid;
+		[conn copyRemoteCredentials: &token];
+		audit_token_to_au32(token, NULL, NULL, NULL, NULL, NULL, NULL, &asid, NULL);
+		return asid;
+	}
 	return AU_ASSIGN_ASID;
 };
 
@@ -1127,7 +1205,9 @@ void xpc_connection_enable_termination_imminent_event(xpc_connection_t xconn) {
 
 XPC_EXPORT
 void xpc_connection_get_audit_token(xpc_connection_t xconn, audit_token_t* out_token) {
-	xpc_stub();
+	TO_OBJC_CHECKED(connection, xconn, conn) {
+		[conn copyRemoteCredentials: out_token];
+	}
 };
 
 XPC_EXPORT

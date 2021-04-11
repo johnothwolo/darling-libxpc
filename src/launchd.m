@@ -1,6 +1,7 @@
 #import <xpc/xpc.h>
 #import <launch.h>
 #import <xpc/util.h>
+#import <xpc/private.h>
 
 //
 // private C API
@@ -186,10 +187,69 @@ char* launch_version_for_user_service_4coresim(const char* name) {
 	return NULL;
 };
 
+xpc_object_t ld2xpc(launch_data_t data);
+
+static void launch_data_dict_iterator(launch_data_t value, const char* key, void* context) {
+	xpc_object_t* result = context;
+	xpc_object_t xpc_value = ld2xpc(value);
+	xpc_dictionary_set_value(*result, key, xpc_value);
+};
+
+// this function isn't present in the official libxpc,
+// so i'm guessing that it's actually an inline function
 XPC_EXPORT
 xpc_object_t ld2xpc(launch_data_t data) {
-	xpc_stub();
-	return NULL;
+	xpc_object_t result = NULL;
+
+	switch (launch_data_get_type(data)) {
+		case LAUNCH_DATA_DICTIONARY: {
+			result = xpc_dictionary_create(NULL, NULL, 0);
+			launch_data_dict_iterate(data, launch_data_dict_iterator, &result);
+		} break;
+
+		case LAUNCH_DATA_ARRAY: {
+			size_t length = launch_data_array_get_count(data);
+			result = xpc_array_create(NULL, 0);
+			for (size_t i = 0; i < length; ++i) {
+				xpc_array_append_value(result, ld2xpc(launch_data_array_get_index(data, i)));
+			}
+		} break;
+
+		case LAUNCH_DATA_FD: {
+			result = xpc_fd_create(launch_data_get_fd(data));
+		} break;
+
+		case LAUNCH_DATA_INTEGER: {
+			result = xpc_int64_create(launch_data_get_integer(data));
+		} break;
+
+		case LAUNCH_DATA_REAL: {
+			result = xpc_double_create(launch_data_get_real(data));
+		} break;
+
+		case LAUNCH_DATA_BOOL: {
+			result = xpc_bool_create(launch_data_get_bool(data));
+		} break;
+
+		case LAUNCH_DATA_STRING: {
+			result = xpc_string_create(launch_data_get_string(data));
+		} break;
+
+		case LAUNCH_DATA_OPAQUE: {
+			result = xpc_data_create(launch_data_get_opaque(data), launch_data_get_opaque_size(data));
+		} break;
+
+		case LAUNCH_DATA_ERRNO: {
+			result = xpc_int64_create(launch_data_get_errno(data));
+		} break;
+
+		case LAUNCH_DATA_MACHPORT: {
+			// NOTE: i have verified that the contained port does in fact always hold a receive right, so this is the right XPC class to use
+			result = xpc_mach_recv_create(launch_data_get_machport(data));
+		} break;
+	}
+
+	return result;
 };
 
 XPC_EXPORT

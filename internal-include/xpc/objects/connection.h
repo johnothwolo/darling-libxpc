@@ -58,6 +58,9 @@ struct xpc_connection_s {
 	bool activated;
 	pthread_rwlock_t server_peers_lock;
 	xpc_genarr_connection_t server_peers;
+	pthread_rwlock_t remote_credentials_lock;
+
+	audit_token_t remote_credentials;
 
 	//
 	// mutable and lock-free
@@ -138,6 +141,9 @@ struct xpc_connection_s {
 - (void)sendMessage: (XPC_CLASS(dictionary)*)message;
 - (void)sendMessage: (XPC_CLASS(dictionary)*)message queue: (dispatch_queue_t)queue withReply: (xpc_handler_t)handler;
 - (xpc_object_t)sendMessageWithSynchronousReply: (XPC_CLASS(dictionary)*)message;
+
+- (void)setRemoteCredentials: (audit_token_t*)token;
+- (void)copyRemoteCredentials: (audit_token_t*)outToken;
 
 @end
 

@@ -8,6 +8,8 @@
 #include <xpc/launchd.h>
 #include <xpc/private/pipe.h>
 #include <xpc/private/endpoint.h>
+#include <xpc/private/mach_send.h>
+#include <xpc/private/mach_recv.h>
 
 #ifdef __cplusplus
 extern "C" {

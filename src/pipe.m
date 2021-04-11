@@ -99,37 +99,37 @@ XPC_CLASS_HEADER(pipe);
 
 	switch (ret) {
 		case MACH_RCV_INVALID_NAME: /* fallthrough */
-			case MACH_RCV_IN_SET: /* fallthrough */
-			case MACH_RCV_TIMED_OUT: /* fallthrough */
-			case MACH_RCV_INTERRUPTED: /* fallthrough */
-			case MACH_RCV_PORT_DIED: /* fallthrough */
-			case MACH_RCV_PORT_CHANGED: {
-				// nothing happened to the message
+		case MACH_RCV_IN_SET: /* fallthrough */
+		case MACH_RCV_TIMED_OUT: /* fallthrough */
+		case MACH_RCV_INTERRUPTED: /* fallthrough */
+		case MACH_RCV_PORT_DIED: /* fallthrough */
+		case MACH_RCV_PORT_CHANGED: {
+			// nothing happened to the message
 
-				status = EIO;
-			} break;
+			status = EIO;
+		} break;
 
-			case MACH_RCV_HEADER_ERROR: /* fallthrough */
-			case MACH_RCV_INVALID_NOTIFY: {
-				// message was dequeued and destroyed
+		case MACH_RCV_HEADER_ERROR: /* fallthrough */
+		case MACH_RCV_INVALID_NOTIFY: {
+			// message was dequeued and destroyed
 
-				status = EIO;
-			} break;
+			status = EIO;
+		} break;
 
-			case MACH_RCV_TOO_LARGE: {
-				status = EAGAIN;
-			} break;
+		case MACH_RCV_TOO_LARGE: {
+			status = EAGAIN;
+		} break;
 
-			case MACH_RCV_BODY_ERROR: /* fallthrough */
-			case MACH_RCV_INVALID_DATA: {
-				// message was received
+		case MACH_RCV_BODY_ERROR: /* fallthrough */
+		case MACH_RCV_INVALID_DATA: {
+			// message was received
 
-				status = EIO;
-			} break;
+			status = EIO;
+		} break;
 
-			case MACH_MSG_SUCCESS: {
-				status = 0;
-			} break;
+		case MACH_MSG_SUCCESS: {
+			status = 0;
+		} break;
 	}
 
 	return status;
@@ -378,7 +378,7 @@ out:
 
 	self = [self initWithPort: servicePort flags: flags];
 
-	//xpc_mach_port_release_send(servicePort);
+	xpc_mach_port_release_send(servicePort);
 
 	return self;
 }
@@ -390,12 +390,10 @@ out:
 
 		pthread_rwlock_init(&this->state_lock, NULL);
 
-		/*
 		if (xpc_mach_port_retain_send(port) != KERN_SUCCESS) {
 			[self release];
 			return nil;
 		}
-		*/
 
 		this->checkin_port = port;
 		this->send_port = xpc_mach_port_create_send_receive();

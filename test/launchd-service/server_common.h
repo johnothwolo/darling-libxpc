@@ -34,6 +34,7 @@ static void handle_server_peer_error(xpc_connection_t connection, xpc_object_t e
 };
 
 static void handle_new_connection(xpc_connection_t connection) {
+	server_peer_log("got new client with pid=%d, euid=%d, and egid=%d", xpc_connection_get_pid(connection), xpc_connection_get_euid(connection), xpc_connection_get_egid(connection));
 	xpc_connection_set_event_handler(connection, ^(xpc_object_t object) {
 		xpc_type_t obj_type = xpc_get_type(object);
 		if (obj_type == (xpc_type_t)XPC_TYPE_DICTIONARY) {
