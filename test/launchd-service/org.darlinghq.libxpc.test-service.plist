@@ -11,8 +11,5 @@
 		<key>org.darlinghq.libxpc.test-service</key>
 		<true/>
 	</dict>
-	<!-- redirect output to a logfile because launchd's stdout output is messed up (incorrect line breaks) -->
-	<key>StandardOutPath</key>
-	<string>/var/log/libxpc_test_service.log</string>
 </dict>
 </plist>

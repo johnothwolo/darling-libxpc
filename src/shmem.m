@@ -17,11 +17,13 @@ XPC_CLASS_HEADER(shmem);
 
 XPC_EXPORT
 xpc_object_t xpc_shmem_create(void* region, size_t length) {
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 size_t xpc_shmem_map(xpc_object_t xshmem, void** region) {
+	xpc_stub();
 	return 0;
 };
 
@@ -31,15 +33,18 @@ size_t xpc_shmem_map(xpc_object_t xshmem, void** region) {
 
 XPC_EXPORT
 mach_port_t _xpc_shmem_get_mach_port(xpc_object_t xshmem) {
+	xpc_stub();
 	return MACH_PORT_NULL;
 };
 
 XPC_EXPORT
 xpc_object_t xpc_shmem_create_readonly(const void* region, size_t length) {
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 size_t xpc_shmem_get_length(xpc_object_t xshmem) {
+	xpc_stub();
 	return 0;
 };

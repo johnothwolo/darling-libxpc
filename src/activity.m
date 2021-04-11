@@ -116,37 +116,41 @@ XPC_CLASS_HEADER(activity);
 
 XPC_EXPORT
 void xpc_activity_register(const char *identifier, xpc_object_t criteria, xpc_activity_handler_t handler) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 xpc_object_t xpc_activity_copy_criteria(xpc_activity_t activity) {
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 void xpc_activity_set_criteria(xpc_activity_t activity, xpc_object_t criteria) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 xpc_activity_state_t xpc_activity_get_state(xpc_activity_t activity) {
+	xpc_stub();
 	return 0;
 };
 
 XPC_EXPORT
 bool xpc_activity_set_state(xpc_activity_t activity, xpc_activity_state_t state) {
+	xpc_stub();
 	return false;
 };
 
 XPC_EXPORT
 bool xpc_activity_should_defer(xpc_activity_t activity) {
+	xpc_stub();
 	return false;
 };
 
 XPC_EXPORT
 void xpc_activity_unregister(const char* identifier) {
-
+	xpc_stub();
 };
 
 //
@@ -159,23 +163,26 @@ XPC_EXPORT
 struct xpc_activity_eligibility_changed_handler_s* xpc_activity_add_eligibility_changed_handler(xpc_activity_t xactivity, void (^handler)()) {
 	// the return type is some kind of array or structure that must be freed
 	// no clue what the handler parameters are
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 dispatch_queue_t xpc_activity_copy_dispatch_queue(xpc_activity_t xactivity) {
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 char* xpc_activity_copy_identifier(xpc_activity_t xactivity) {
 	// returns a string that must be freed
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 void xpc_activity_debug(const char* identifier, uint64_t flags) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
@@ -202,22 +209,22 @@ int xpc_activity_get_percentage() {
 
 XPC_EXPORT
 void xpc_activity_list(const char* identifier) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_activity_remove_eligibility_changed_handler(xpc_activity_t xactivity, struct xpc_activity_eligibility_changed_handler_s* handler_context) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_activity_run(const char* identifier) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_activity_set_completion_status(xpc_activity_t activity, uint64_t status) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT

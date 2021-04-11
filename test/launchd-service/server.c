@@ -8,10 +8,11 @@
 #include "service.h"
 #include "../test-util.h"
 
-#define server_peer_log(format, ...) printf("server peer connection: " format "\n", ## __VA_ARGS__)
-#define server_peer_error(format, ...) fprintf(stderr, "server peer connection: " format "\n", ## __VA_ARGS__)
-#define server_log(format, ...) printf("server connection: " format "\n", ## __VA_ARGS__)
-#define server_error(format, ...) fprintf(stderr, "server connection: " format "\n", ## __VA_ARGS__)
+// if we don't flush the output, it doesn't get written, for some reason
+#define server_peer_log(format, ...) do { printf("server peer connection: " format "\n", ## __VA_ARGS__); fflush(stdout); } while (0)
+#define server_peer_error(format, ...) do { fprintf(stderr, "server peer connection: " format "\n", ## __VA_ARGS__); fflush(stderr); } while (0)
+#define server_log(format, ...) do { printf("server connection: " format "\n", ## __VA_ARGS__); fflush(stdout); } while (0)
+#define server_error(format, ...) do { fprintf(stderr, "server connection: " format "\n", ## __VA_ARGS__); fflush(stderr); } while (0)
 
 #include "server_common.h"
 
@@ -126,8 +127,18 @@ static void handle_server_peer_message(xpc_object_t message) {
 	}
 };
 
+// manually log everything to a file because launchd's default stdout is broken and so is its redirection
+static void replace_output_fds(void) {
+	freopen("/var/log/libxpc_test_service.log", "a", stdout);
+	freopen("/var/log/libxpc_test_service.log", "a", stderr);
+};
+
 int main(int arc, char** argv) {
-	xpc_connection_t server = xpc_connection_create_mach_service(TEST_SERVICE_NAME, NULL, XPC_CONNECTION_MACH_SERVICE_LISTENER);
+	xpc_connection_t server = NULL;
+
+	replace_output_fds();
+
+	server = xpc_connection_create_mach_service(TEST_SERVICE_NAME, NULL, XPC_CONNECTION_MACH_SERVICE_LISTENER);
 
 	xpc_connection_set_event_handler(server, ^(xpc_object_t object) {
 		xpc_type_t obj_type = xpc_get_type(object);

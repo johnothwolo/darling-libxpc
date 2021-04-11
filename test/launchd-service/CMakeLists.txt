@@ -1,5 +1,6 @@
 add_darling_executable(libxpc_test_server server.c)
 add_darling_executable(libxpc_test_client client.c)
+add_darling_executable(libxpc_test_pipe_client pipe_client.c)
 
 target_link_libraries(libxpc_test_server
 	xpc_static
@@ -11,10 +12,16 @@ target_link_libraries(libxpc_test_client
 	objc
 )
 
+target_link_libraries(libxpc_test_pipe_client
+	xpc_static
+	objc
+)
+
 install(
 	TARGETS
 		libxpc_test_server
 		libxpc_test_client
+		libxpc_test_pipe_client
 	DESTINATION
 		libexec/darling/usr/libexec
 )

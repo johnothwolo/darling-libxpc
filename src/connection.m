@@ -1013,21 +1013,25 @@ const char* xpc_connection_get_name(xpc_connection_t xconn) {
 
 XPC_EXPORT
 uid_t xpc_connection_get_euid(xpc_connection_t xconn) {
+	xpc_stub();
 	return UID_MAX;
 };
 
 XPC_EXPORT
 gid_t xpc_connection_get_egid(xpc_connection_t xconn) {
+	xpc_stub();
 	return GID_MAX;
 };
 
 XPC_EXPORT
 pid_t xpc_connection_get_pid(xpc_connection_t xconn) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 au_asid_t xpc_connection_get_asid(xpc_connection_t xconn) {
+	xpc_stub();
 	return AU_ASSIGN_ASID;
 };
 
@@ -1055,12 +1059,12 @@ void xpc_connection_set_finalizer_f(xpc_connection_t xconn, xpc_finalizer_t fina
 
 XPC_EXPORT
 void xpc_connection_set_legacy(xpc_connection_t xconn) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_privileged(xpc_connection_t xconn) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
@@ -1074,16 +1078,17 @@ void xpc_connection_activate(xpc_connection_t xconn) {
 
 XPC_EXPORT
 void xpc_connection_set_target_uid(xpc_connection_t xconn, uid_t uid) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_instance(xpc_connection_t xconn, uuid_t uuid) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 xpc_object_t xpc_connection_copy_entitlement_value(xpc_connection_t xconn, const char* entitlement) {
+	xpc_stub();
 	return NULL;
 };
 
@@ -1095,11 +1100,13 @@ XPC_EXPORT
 void _xpc_connection_set_event_handler_f(xpc_connection_t xconn, void (*handler)(xpc_object_t event, void* context)) {
 	// unsure about the parameters to the handler
 	// maybe the second parameter to the handler is actually the connection object?
+	xpc_stub();
 };
 
 XPC_EXPORT
 char* xpc_connection_copy_bundle_id(xpc_connection_t xconn) {
 	// returns a string that must be freed
+	xpc_stub();
 	return NULL;
 };
 
@@ -1110,27 +1117,28 @@ xpc_connection_t xpc_connection_create_listener(const char* name, dispatch_queue
 
 XPC_EXPORT
 void xpc_connection_enable_sim2host_4sim(xpc_connection_t xconn) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_enable_termination_imminent_event(xpc_connection_t xconn) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_get_audit_token(xpc_connection_t xconn, audit_token_t* out_token) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 uint8_t xpc_connection_get_bs_type(xpc_connection_t xconn) {
+	xpc_stub();
 	return 0;
 };
 
 XPC_EXPORT
 void xpc_connection_get_instance(xpc_connection_t xconn, uint8_t* out_uuid) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
@@ -1140,46 +1148,47 @@ bool xpc_connection_is_extension(xpc_connection_t xconn) {
 
 XPC_EXPORT
 void xpc_connection_kill(xpc_connection_t xconn, int signal) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 
 void xpc_connection_send_notification(xpc_connection_t xconn, xpc_object_t details) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_bootstrap(xpc_connection_t xconn, xpc_object_t bootstrap) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_bs_type(xpc_connection_t xconn, uint8_t type) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_event_channel(xpc_connection_t xconn, const char* channel_name) {
 	// parameter 2 is a guess
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_non_launching(xpc_connection_t xconn, bool non_launching) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_oneshot_instance(xpc_connection_t xconn, const uint8_t* uuid) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_qos_class_fallback(xpc_connection_t xconn, dispatch_qos_class_t qos_class) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_connection_set_qos_class_floor(xpc_connection_t xconn, dispatch_qos_class_t qos_class, int relative_priority) {
-
+	xpc_stub();
 };

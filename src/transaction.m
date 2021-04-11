@@ -2,6 +2,7 @@
 #include <os/object_private.h>
 #import <Foundation/NSZone.h>
 #import <xpc/xpc.h>
+#import <xpc/util.h>
 
 OS_OBJECT_NONLAZY_CLASS
 @implementation OS_OBJECT_CLASS(os_transaction)
@@ -33,11 +34,13 @@ os_transaction_t os_transaction_create(const char* transaction_name) {
 
 XPC_EXPORT
 char* os_transaction_copy_description(os_transaction_t transaction) {
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 int os_transaction_needs_more_time(os_transaction_t transaction) {
+	xpc_stub();
 	return -1;
 };
 
@@ -46,12 +49,12 @@ int os_transaction_needs_more_time(os_transaction_t transaction) {
 
 XPC_EXPORT
 void xpc_transaction_begin(void) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_transaction_end(void) {
-
+	xpc_stub();
 };
 
 //
@@ -60,15 +63,15 @@ void xpc_transaction_end(void) {
 
 XPC_EXPORT
 void xpc_transaction_exit_clean(void) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_transaction_interrupt_clean_exit(void) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 void xpc_transactions_enable(void) {
-
+	xpc_stub();
 };

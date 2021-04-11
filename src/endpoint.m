@@ -158,6 +158,7 @@ mach_port_t xpc_endpoint_copy_listener_port_4sim(xpc_endpoint_t xendpoint) {
 XPC_EXPORT
 xpc_endpoint_t xpc_endpoint_create_bs_named(const char* name, uint64_t flags, uint8_t* out_type) {
 	// parameter 3's purpose is a guess
+	xpc_stub();
 	return NULL;
 };
 

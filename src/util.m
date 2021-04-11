@@ -5,9 +5,13 @@
 #include <sys/syslog.h>
 #import <xpc/objects/connection.h>
 
+#include <stdio.h>
+
 #ifndef XPC_LOG_TO_STDOUT_TOO
 	#define XPC_LOG_TO_STDOUT_TOO 0
 #endif
+
+static bool enable_stub_messages = false;
 
 XPC_CLASS(object)* xpc_retain_for_collection(XPC_CLASS(object)* object) {
 	// connections aren't retained by collections
@@ -228,4 +232,15 @@ void _xpc_log(const char* function, const char* file, size_t line, xpc_log_prior
 	va_start(args, format);
 	_xpc_logv(function, file, line, priority, format, args);
 	va_end(args);
+};
+
+void xpc_stub_init(void) {
+	enable_stub_messages = getenv("STUB_VERBOSE") != NULL;
+};
+
+void _xpc_stub(const char* function, const char* file, size_t line) {
+	if (enable_stub_messages) {
+		printf("libxpc: stub called %s (at %s:%zu)\n", function, file, line);
+		fflush(stdout);
+	}
 };

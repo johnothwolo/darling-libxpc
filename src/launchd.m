@@ -1,5 +1,6 @@
 #import <xpc/xpc.h>
 #import <launch.h>
+#import <xpc/util.h>
 
 //
 // private C API
@@ -13,6 +14,7 @@ xpc_object_t _launch_msg2(xpc_object_t request, int type, uint64_t handle) {
 	// valid values for `type`: 0, 1, 2, 3
 	// `handle` can be a normal value or it can be UINT64_MAX (only matters when `type` == )
 	// returns a uint64 object
+	xpc_stub();
 	return NULL;
 };
 
@@ -21,11 +23,13 @@ int _launch_service_stats_copy_4ppse_impl(struct some_launch_service_stats_struc
 	// no clue what the structure layout is
 	// `type` MUST be 2 or else the function crashes
 	// the return type seems to be a status code
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_activate_socket(const char* key, int** fds, size_t* count) {
+	xpc_stub();
 	return -1;
 };
 
@@ -33,67 +37,78 @@ XPC_EXPORT
 int launch_add_external_service(int handle, const char* path, xpc_object_t overlay) {
 	// `overlay` is probably a dictionary
 	// no clue what type of value `handle` is other than some integer
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_bootout_user_service_4coresim(const char* name) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 xpc_object_t launch_copy_busy_extension_instances(const char** names, size_t name_count) {
 	// returns an array
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 xpc_object_t launch_copy_endpoints_properties_for_pid(pid_t pid) {
 	// returns a dictionary
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 xpc_object_t launch_copy_extension_properties(xpc_connection_t xconn) {
 	// returns a dictionary
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 xpc_object_t launch_copy_extension_properties_for_pid(pid_t pid) {
 	// returns a dictionary
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 xpc_object_t launch_copy_properties_for_pid_4assertiond(pid_t pid) {
 	// returns a dictionary
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 int launch_create_persona(uid_t uid, uint64_t flags) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_destroy_persona(int handle) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_disable_directory(const char* path) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_enable_directory(const char* path) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 void launch_extension_check_in_live_4UIKit(void) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT const char* launch_extension_property_bundle_id = "XPCExtensionBundleIdentifier";
@@ -106,17 +121,20 @@ XPC_EXPORT const char* launch_extension_property_xpc_bundle = "XPCExtensionXPCBu
 
 XPC_EXPORT
 int launch_get_service_enabled(const char* name, bool* out_loaded, bool* out_enabled) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_get_system_service_enabled(const char* name, bool* out_loaded, bool* out_enabled) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 char* launch_path_for_user_service_4coresim(const char* name) {
 	// returns a string that must be freed
+	xpc_stub();
 	return NULL;
 };
 
@@ -128,46 +146,54 @@ XPC_EXPORT const char* launch_perfcheck_property_endpoints = "XPCServiceEndpoint
 
 XPC_EXPORT
 void launch_remove_external_service(const char* name, const char* version, dispatch_queue_t queue, void (^callback)(int error)) {
-
+	xpc_stub();
 };
 
 XPC_EXPORT
 int launch_service_stats_disable_4ppse(void) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_service_stats_enable_4ppse(void) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 bool launch_service_stats_is_enabled_4ppse() {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_set_service_enabled(const char* name, bool enabled) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 int launch_set_system_service_enabled(const char* name, bool enabled) {
+	xpc_stub();
 	return -1;
 };
 
 XPC_EXPORT
 char* launch_version_for_user_service_4coresim(const char* name) {
 	// returns a string that must be freed
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 xpc_object_t ld2xpc(launch_data_t data) {
+	xpc_stub();
 	return NULL;
 };
 
 XPC_EXPORT
 kern_return_t xpc_call_wakeup(mach_port_t port, int status) {
+	xpc_stub();
 	return -1;
 };

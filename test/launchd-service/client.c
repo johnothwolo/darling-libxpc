@@ -20,6 +20,7 @@
 #define server_error(format, ...) fprintf(stderr, "anonymous server connection: " format "\n", ## __VA_ARGS__)
 
 #include "server_common.h"
+#include "client_common.h"
 
 dispatch_semaphore_t waiter;
 
@@ -185,30 +186,12 @@ static xpc_endpoint_t setup_anonymous_server(void) {
 };
 
 int main(int argc, char** argv) {
-	test_service_message_type_t message_type = test_service_message_type_poke;
+	test_service_message_type_t message_type = determine_message_type(argc, argv);
 	xpc_connection_t client = xpc_connection_create(TEST_SERVICE_NAME, NULL);
 	xpc_object_t message = NULL;
 	bool synchronous_reply = false;
 	void (^send_with_reply)(void) = NULL;
 	waiter = dispatch_semaphore_create(0);
-
-	if (argc > 1) {
-		char first = argv[1][0];
-		if (first == 'p' || first == 'P') {
-			message_type = test_service_message_type_poke;
-		} else if (first == 'h' || first == 'H') {
-			message_type = test_service_message_type_hello;
-		} else if (first == 'e' || first == 'E') {
-			message_type = test_service_message_type_echo;
-		} else if (first == 'f' || first == 'F') {
-			message_type = test_service_message_type_friendship_invitation;
-		} else if (first == 'm' || first == 'M') {
-			message_type = test_service_message_type_meet_a_new_friend;
-		} else {
-			client_error("unparsable argument: %s", argv[1]);
-			exit(1);
-		}
-	}
 
 	if (argc > 2) {
 		synchronous_reply = true;

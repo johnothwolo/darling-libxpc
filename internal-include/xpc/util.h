@@ -259,4 +259,14 @@ void _xpc_logv(const char* function, const char* file, size_t line, xpc_log_prio
  */
 #define xpc_logv(...) _xpc_logv(__PRETTY_FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
 
+/**
+ * Prints a message indicating that a stub was called.
+ */
+void _xpc_stub(const char* function, const char* file, size_t line);
+
+/**
+ * Prints a message indicating that a stub was called. This macro automatically fills in the arguments to `_xpc_stub`.
+ */
+#define xpc_stub() _xpc_stub(__PRETTY_FUNCTION__, __FILE__, __LINE__)
+
 #endif // _XPC_UTIL_H_

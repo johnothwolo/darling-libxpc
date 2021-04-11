@@ -38,5 +38,5 @@ struct some_extension_type_struct;
 
 XPC_EXPORT
 void xpc_extension_type_init(struct some_extension_type_struct* extension_type, void* some_user_function_probably) {
-
+	xpc_stub();
 };
