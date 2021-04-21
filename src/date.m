@@ -6,7 +6,81 @@
 
 #include <time.h>
 
-XPC_WRAPPER_CLASS_IMPL(date, int64_t, "%lld");
+XPC_CLASS_SYMBOL_DECL(date);
+
+OS_OBJECT_NONLAZY_CLASS
+@implementation XPC_CLASS(date)
+
+XPC_CLASS_HEADER(date);
+
+- (char*)xpcDescription
+{
+	char* output = NULL;
+	asprintf(&output, "<%s: %lld>", xpc_class_name(self), self.value);
+	return output;
+}
+
+- (int64_t)value
+{
+	XPC_THIS_DECL(date);
+	if (this->is_absolute) {
+		return (int64_t)((this->absolute_value + (double)NSTimeIntervalSince1970) * (double)NSEC_PER_SEC);
+	} else {
+		return this->value;
+	}
+}
+
+- (void)setValue: (int64_t)value
+{
+	XPC_THIS_DECL(date);
+	this->value = value;
+	this->is_absolute = false;
+}
+
+- (double)absoluteValue
+{
+	XPC_THIS_DECL(date);
+	if (this->is_absolute) {
+		return this->absolute_value;
+	} else {
+		return ((double)this->value / (double)NSEC_PER_SEC) - (double)NSTimeIntervalSince1970;
+	}
+}
+
+- (void)setAbsoluteValue: (double)absoluteValue
+{
+	XPC_THIS_DECL(date);
+	this->absolute_value = absoluteValue;
+	this->is_absolute = true;
+}
+
+- (instancetype)initWithValue: (int64_t)value
+{
+	if (self = [super init]) {
+		XPC_THIS_DECL(date);
+		this->value = value;
+	}
+	return self;
+}
+
+- (instancetype)initWithAbsoluteValue: (double)value
+{
+	if (self = [super init]) {
+		XPC_THIS_DECL(date);
+		this->absolute_value = value;
+		this->is_absolute = true;
+	}
+	return self;
+}
+
+- (NSUInteger)hash
+{
+	XPC_THIS_DECL(date);
+	return xpc_raw_data_hash(&this->value, sizeof(this->value));
+}
+
+@end
+
 XPC_WRAPPER_CLASS_SERIAL_IMPL(date, int64_t, DATE, U64, uint64_t);
 
 //
@@ -36,14 +110,14 @@ int64_t xpc_date_get_value(xpc_object_t xdate) {
 //
 
 XPC_EXPORT
-xpc_object_t xpc_date_create_absolute(int64_t value) {
-	return [[XPC_CLASS(date) alloc] initWithValue: (value + NSTimeIntervalSince1970) * NSEC_PER_SEC];
+xpc_object_t xpc_date_create_absolute(double value) {
+	return [[XPC_CLASS(date) alloc] initWithAbsoluteValue: value];
 };
 
 XPC_EXPORT
-int64_t xpc_date_get_value_absolute(xpc_object_t xdate) {
+double xpc_date_get_value_absolute(xpc_object_t xdate) {
 	TO_OBJC_CHECKED(date, xdate, date) {
-		return (date.value / NSEC_PER_SEC) - NSTimeIntervalSince1970;
+		return date.absoluteValue;
 	}
 	return 0;
 };
