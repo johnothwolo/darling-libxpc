@@ -10,6 +10,11 @@
 #include <sys/syslog.h>
 
 /**
+ * Expands to an expression that evaluates to `true` if the given expression is an object of the given XPC class, or `false` otherwise.
+ */
+#define XPC_CHECK(className, expression) ([(expression) isKindOfClass: [XPC_CLASS(className) class]])
+
+/**
  * Defines `objcName` by casting `origName`, but also checks to ensure it's not `nil`
  * and to ensure it is an XPC object of the given `className`.
  *
@@ -268,5 +273,15 @@ void _xpc_stub(const char* function, const char* file, size_t line);
  * Prints a message indicating that a stub was called. This macro automatically fills in the arguments to `_xpc_stub`.
  */
 #define xpc_stub() _xpc_stub(__PRETTY_FUNCTION__, __FILE__, __LINE__)
+
+/**
+ * `true` if the given path exists and points to a regular file, `false` otherwise.
+ */
+bool xpc_path_is_file(const char* path);
+
+/**
+ * Returns a copy of the path for the main executable. Must be freed.
+ */
+char* xpc_copy_main_executable_path(void);
 
 #endif // _XPC_UTIL_H_

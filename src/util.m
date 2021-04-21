@@ -4,14 +4,32 @@
 #include <sys/reason.h>
 #include <sys/syslog.h>
 #import <xpc/objects/connection.h>
-
+#include <sys/stat.h>
 #include <stdio.h>
+#include <mach-o/dyld.h>
 
 #ifndef XPC_LOG_TO_STDOUT_TOO
 	#define XPC_LOG_TO_STDOUT_TOO 0
 #endif
 
 static bool enable_stub_messages = false;
+
+static bool enable_syslog(void) {
+	static bool enabled = true;
+	static dispatch_once_t onceToken;
+
+	dispatch_once(&onceToken, ^{
+		char* execPath = xpc_copy_main_executable_path();
+		// disable syslog within the syslog and aslmanager daemons
+		// (so that we don't end up trying to send a message to ourselves)
+		if (strcmp(execPath, "/usr/sbin/syslogd") == 0 || strcmp(execPath, "/usr/sbin/aslmanager") == 0) {
+			enabled = false;
+		}
+		free(execPath);
+	});
+
+	return enabled;
+};
 
 XPC_CLASS(object)* xpc_retain_for_collection(XPC_CLASS(object)* object) {
 	// connections aren't retained by collections
@@ -223,7 +241,9 @@ void _xpc_logv(const char* function, const char* file, size_t line, xpc_log_prio
 	printf("libxpc: %s:%zu: %s: %s\n", file, line, function, reason);
 	fflush(stdout);
 #endif
-	syslog(priority, "libxpc: %s:%zu: %s: %s", file, line, function, reason);
+	if (enable_syslog()) {
+		syslog(priority, "libxpc: %s:%zu: %s: %s", file, line, function, reason);
+	}
 	free(reason);
 };
 
@@ -243,4 +263,31 @@ void _xpc_stub(const char* function, const char* file, size_t line) {
 		printf("libxpc: stub called %s (at %s:%zu)\n", function, file, line);
 		fflush(stdout);
 	}
+};
+
+bool xpc_path_is_file(const char* path) {
+	struct stat stats;
+	if (stat(path, &stats) != 0) {
+		return false;
+	}
+	return S_ISREG(stats.st_mode);
+};
+
+char* xpc_copy_main_executable_path(void) {
+	char* result = NULL;
+	uint32_t resultSize = MAXPATHLEN + 1;
+
+retry:
+	result = realloc(result, resultSize);
+	if (!result) {
+		goto out;
+	}
+
+	if (_NSGetExecutablePath(result, &resultSize) != 0) {
+		// dyld already set resultSize to the necessary size
+		goto retry;
+	}
+
+out:
+	return result;
 };

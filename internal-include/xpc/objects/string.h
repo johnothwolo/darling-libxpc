@@ -21,14 +21,50 @@ struct xpc_string_s {
 @property(readonly) NSUInteger byteLength;
 @property(readonly) const char* UTF8String;
 
++ (instancetype)stringWithUTF8String: (const char*)string;
+// non-NSString method
++ (instancetype)stringWithUTF8String: (const char*)string byteLength: (NSUInteger)byteLength;
+// non-NSString method
++ (instancetype)stringWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt;
++ (instancetype) XPC_PRINTF(1, 2) stringWithFormat: (const char*)format, ...;
+
+// non-NSString method
+- (instancetype)initWithUTF8String: (const char*)string byteLength: (NSUInteger)byteLength;
 - (instancetype)initWithUTF8String: (const char*)string;
 // non-NSString method
+- (instancetype)initWithUTF8StringNoCopy: (const char*)string byteLength: (NSUInteger)byteLength freeWhenDone: (BOOL)freeIt;
+// non-NSString method
 - (instancetype)initWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt;
-- (instancetype)initWithFormat: (const char*)format, ...;
-- (instancetype)initWithFormat: (const char*)format arguments: (va_list)args;
+- (instancetype) XPC_PRINTF(1, 2) initWithFormat: (const char*)format, ...;
+- (instancetype) XPC_PRINTF(1, 0) initWithFormat: (const char*)format arguments: (va_list)args;
 
 // non-NSString method
 - (void)replaceStringWithString: (const char*)string;
+
+// non-NSString method
+- (instancetype)forceCopy;
+
+// non-NSString method
+- (void)appendString: (const char*)string;
+// non-NSString method
+- (void)appendString: (const char*)string length: (NSUInteger)length;
+- (XPC_CLASS(string)*)stringByAppendingString: (const char*)string;
+- (BOOL)isEqualToString: (const char*)string;
+
+@end
+
+@interface XPC_CLASS(string) (XPCStringPathExtensions)
+
+@property(readonly) const char* pathExtension;
+// NOTE: this property deviates from the NSString behavior in that it does not ignore trailing slashes
+@property(readonly) const char* lastPathComponent;
+@property(readonly, copy) XPC_CLASS(string)* stringByDeletingPathExtension;
+
+- (XPC_CLASS(string)*)stringByResolvingSymlinksInPath;
+- (XPC_CLASS(string)*)stringByAppendingPathComponent: (const char*)component;
+// NOTE: this method deviates from the NSString behavior in that it does not ignore trailing slashes
+- (XPC_CLASS(string)*)stringByDeletingLastPathComponent;
+
 
 @end
 

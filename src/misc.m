@@ -248,18 +248,6 @@ xpc_object_t xpc_create_from_serialization_with_ool(void* data, size_t data_leng
 };
 
 XPC_EXPORT
-xpc_object_t xpc_create_from_plist(void* data, size_t data_length) {
-	xpc_stub();
-	return NULL;
-};
-
-XPC_EXPORT
-xpc_object_t xpc_create_from_plist_descriptor(int fd, dispatch_queue_t queue) {
-	xpc_stub();
-	return NULL;
-};
-
-XPC_EXPORT
 xpc_object_t xpc_create_reply_with_format_and_arguments(xpc_object_t original, const char* format, va_list args) {
 	xpc_stub();
 	return NULL;

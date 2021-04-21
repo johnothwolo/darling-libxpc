@@ -52,6 +52,7 @@ set(xpc_sources
 	src/misc.m
 	src/null.m
 	src/pipe.m
+	src/plist.m
 	src/pointer.m
 	src/runtime.m
 	src/serialization.m

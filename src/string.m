@@ -10,6 +10,30 @@ OS_OBJECT_NONLAZY_CLASS
 
 XPC_CLASS_HEADER(string);
 
++ (instancetype)stringWithUTF8String: (const char*)string
+{
+	return [[[[self class] alloc] initWithUTF8String: string] autorelease];
+}
+
++ (instancetype)stringWithUTF8String: (const char*)string byteLength: (NSUInteger)byteLength
+{
+	return [[[[self class] alloc] initWithUTF8String: string byteLength: byteLength] autorelease];
+}
+
++ (instancetype)stringWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt
+{
+	return [[[[self class] alloc] initWithUTF8StringNoCopy: string freeWhenDone: freeIt] autorelease];
+}
+
++ (instancetype)stringWithFormat: (const char*)format, ...
+{
+	va_list args;
+	va_start(args, format);
+	XPC_CLASS(string)* result = [[[[self class] alloc] initWithFormat: format arguments: args] autorelease];
+	va_end(args);
+	return result;
+}
+
 - (void)dealloc
 {
 	XPC_THIS_DECL(string);
@@ -45,34 +69,50 @@ XPC_CLASS_HEADER(string);
 	return this->string;
 }
 
-- (instancetype)initWithUTF8String: (const char*)string
+- (instancetype)init
+{
+	return [self initWithUTF8String: "" byteLength: 0];
+}
+
+- (instancetype)initWithUTF8String: (const char*)string byteLength: (NSUInteger)byteLength
 {
 	if (self = [super init]) {
 		XPC_THIS_DECL(string);
 
-		this->byteLength = strlen(string);
+		this->byteLength = byteLength;
 		char* buf = malloc(this->byteLength + 1);
 		if (!buf) {
 			[self release];
 			return nil;
 		}
-		strncpy(buf, string, this->byteLength + 1);
+		strncpy(buf, string, this->byteLength);
+		buf[this->byteLength] = '\0';
 		this->string = buf;
 		this->freeWhenDone = YES;
 	}
 	return self;
 }
 
-- (instancetype)initWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt
+- (instancetype)initWithUTF8String: (const char*)string
+{
+	return [self initWithUTF8String: string byteLength: strlen(string)];
+}
+
+- (instancetype)initWithUTF8StringNoCopy: (const char*)string byteLength: (NSUInteger)byteLength freeWhenDone: (BOOL)freeIt
 {
 	if (self = [super init]) {
 		XPC_THIS_DECL(string);
 
-		this->byteLength = strlen(string);
+		this->byteLength = byteLength;
 		this->string = string;
 		this->freeWhenDone = freeIt;
 	}
 	return self;
+}
+
+- (instancetype)initWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt
+{
+	return [self initWithUTF8StringNoCopy: string byteLength: strlen(string) freeWhenDone: freeIt];
 }
 
 - (instancetype)initWithFormat: (const char*)format, ...
@@ -112,7 +152,8 @@ XPC_CLASS_HEADER(string);
 		free((void*)this->string);
 	}
 	this->byteLength = newByteLength;
-	strncpy(newString, string, this->byteLength + 1);
+	strncpy(newString, string, this->byteLength);
+	newString[this->byteLength] = '\0';
 	this->string = newString;
 	this->freeWhenDone = true;
 }
@@ -121,6 +162,49 @@ XPC_CLASS_HEADER(string);
 {
 	XPC_THIS_DECL(string);
 	return xpc_raw_data_hash(this->string, self.byteLength + 1);
+}
+
+- (instancetype)forceCopy
+{
+	return [[[self class] alloc] initWithUTF8String: self.UTF8String];
+}
+
+- (void)appendString: (const char*)string length: (NSUInteger)extraByteLength
+{
+	if (extraByteLength == 0) {
+		return;
+	}
+	XPC_THIS_DECL(string);
+	size_t oldByteLength = self.byteLength;
+	size_t newByteLength = oldByteLength + extraByteLength;
+	char* newString = malloc(newByteLength + 1);
+	if (!newString) {
+		return;
+	}
+	strncpy(newString, this->string, oldByteLength);
+	if (this->freeWhenDone && this->string) {
+		free((void*)this->string);
+	}
+	this->byteLength = newByteLength;
+	strncpy(newString + oldByteLength, string, extraByteLength);
+	newString[newByteLength] = '\0';
+	this->string = newString;
+	this->freeWhenDone = true;
+}
+
+- (void)appendString: (const char*)string
+{
+	return [self appendString: string length: strlen(string)];
+}
+
+- (XPC_CLASS(string)*)stringByAppendingString: (const char*)string
+{
+	return [[self class] stringWithFormat: "%s/%s", self.UTF8String, string];
+}
+
+- (BOOL)isEqualToString: (const char*)string
+{
+	return strcmp(self.UTF8String, string) == 0;
 }
 
 @end
@@ -190,6 +274,62 @@ error_out:
 
 error_out:
 	return NO;
+}
+
+@end
+
+@implementation XPC_CLASS(string) (XPCStringPathExtensions)
+
+- (const char*)pathExtension
+{
+	char* lastDot = strrchr(self.UTF8String, '.');
+	return lastDot ? lastDot + 1 : "";
+}
+
+- (const char*)lastPathComponent
+{
+	char* lastSlash = strrchr(self.UTF8String, '/');
+	return lastSlash ? lastSlash + 1 : "";
+}
+
+- (XPC_CLASS(string)*)stringByDeletingPathExtension
+{
+	char* lastDot = strrchr(self.UTF8String, '.');
+	return (lastDot) ? [[self class] stringWithUTF8String: self.UTF8String byteLength: lastDot - self.UTF8String] : [self forceCopy];
+}
+
+- (XPC_CLASS(string)*)stringByResolvingSymlinksInPath
+{
+	char* resolved = realpath(self.UTF8String, NULL);
+	return resolved ? [[self class] stringWithUTF8StringNoCopy: resolved freeWhenDone: YES] : nil;
+}
+
+- (XPC_CLASS(string)*)stringByAppendingPathComponent: (const char*)component
+{
+	if (self.byteLength == 0) {
+		return [[self class] stringWithUTF8String: component];
+	} else if (self.UTF8String[self.byteLength - 1] == '/') {
+		return [self stringByAppendingString: component];
+	} else {
+		return [[self class] stringWithFormat: "%s/%s", self.UTF8String, component];
+	}
+}
+
+- (XPC_CLASS(string)*)stringByDeletingLastPathComponent
+{
+	char* lastSlash = strrchr(self.UTF8String, '/');
+	if (lastSlash && lastSlash > self.UTF8String) {
+		*lastSlash = '\0'; // temporarily shorten the string for the copy...
+		XPC_CLASS(string)* result = [[self class] stringWithUTF8String: self.UTF8String];
+		*lastSlash = '/'; // ...and then restore it
+		return result;
+	} else if (lastSlash == self.UTF8String) {
+		// if it's the one for the root, return the root
+		return [[self class] stringWithUTF8String: "/"];
+	} else {
+		// otherwise, if it's not present, return an empty string
+		return [[self class] stringWithUTF8String: ""];
+	}
 }
 
 @end

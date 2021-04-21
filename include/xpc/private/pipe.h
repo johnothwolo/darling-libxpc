@@ -7,9 +7,7 @@
 
 #include <xpc/xpc.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
 
 XPC_IGNORE_DUPLICATE_PROTOCOL_PUSH;
 XPC_DECL(xpc_pipe);
@@ -45,8 +43,6 @@ int xpc_pipe_try_receive(mach_port_t port, xpc_object_t* out_object, mach_port_t
 
 int _xpc_pipe_handle_mig(mach_msg_header_t* request, mach_msg_header_t* reply, boolean_t (*demuxer)(mach_msg_header_t* request, mach_msg_header_t* reply));
 
-#ifdef __cplusplus
-};
-#endif
+__END_DECLS
 
 #endif // _XPC_PRIVATE_PIPE_H_

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>name</key>
+	<string>Foo Bar</string>
+
+	<key>size</key>
+	<integer>500</integer>
+
+	<key>temperature</key>
+	<real>86.4</real>
+
+	<key>favorite-colors</key>
+	<array>
+		<string>red</string>
+		<string>green</string>
+		<string>blue</string>
+	</array>
+
+	<key>Some Boolean</key>
+	<true/>
+
+	<key>Some Other Boolean</key>
+	<false/>
+
+	<key>some_random_data</key>
+	<data>
+		VGhpcyBpcyBzb21lIHJhbmRvbSBkYXRhISBUYWRhIQ==
+	</data>
+
+	<key>escapes &amp; comments <!-- like this--></key>
+	<string>look! <![CDATA[some cdata like <this> and <that>!]]></string>
+
+	<key>Dates and Times</key>
+	<array>
+		<date>2021-04-16T02:24:20Z</date>
+		<date>2021-04-16T02:24Z</date>
+		<date>2021-04-16T02Z</date>
+		<date>2021-04-16</date>
+		<date>2021-04</date>
+		<date>2021</date>
+		<date/>
+	</array>
+
+	<key>Look! A nested dictionary!</key>
+	<dict>
+		<key>Some INFO</key>
+		<string>idk; here's a thing</string>
+
+		<key>And a nested array!</key>
+		<array>
+			<array>
+				<string>Ooh!</string>
+				<integer>590</integer>
+			</array>
+			<array>
+				<string>Foo</string>
+			</array>
+			<string>bar</string>
+		</array>
+	</dict>
+</dict>
+</plist>

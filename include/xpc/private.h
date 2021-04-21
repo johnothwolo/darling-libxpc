@@ -10,6 +10,9 @@
 #include <xpc/private/endpoint.h>
 #include <xpc/private/mach_send.h>
 #include <xpc/private/mach_recv.h>
+#include <xpc/private/date.h>
+#include <xpc/private/plist.h>
+#include <xpc/private/bundle.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +59,7 @@ xpc_object_t xpc_create_with_format(const char * format, ...);
 
 xpc_object_t xpc_create_reply_with_format(xpc_object_t original, const char * format, ...);
 
-xpc_object_t xpc_create_from_plist(void *data, size_t size);
+xpc_object_t xpc_create_from_plist(const void *data, size_t size);
 
 void xpc_dictionary_get_audit_token(xpc_object_t, audit_token_t *);
 
