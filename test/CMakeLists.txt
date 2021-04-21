@@ -1,4 +1,5 @@
 add_subdirectory(launchd-service)
+add_subdirectory(bundled-service)
 
 set(TEST_SOURCES
 	array.m

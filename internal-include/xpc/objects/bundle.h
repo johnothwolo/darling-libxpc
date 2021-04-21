@@ -32,6 +32,9 @@ struct xpc_bundle_s {
 // this API is modeled after NSBundle
 // (but we've added lots of non-NSBundle extensions)
 
+// NOTE: differs from NSBundle by returning a new bundle every time it's called
+@property(class, readonly, copy) XPC_CLASS(bundle)* mainBundle;
+
 @property(strong) XPC_CLASS(string)* bundlePath;
 @property(strong) XPC_CLASS(string)* executablePath;
 @property(strong) XPC_CLASS(dictionary)* infoDictionary;

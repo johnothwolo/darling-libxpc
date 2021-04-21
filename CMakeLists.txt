@@ -18,6 +18,7 @@ add_compile_definitions(
 
 add_compile_options(
 	-Wno-extern-initializer
+	-Wno-gnu-folding-constant
 )
 
 add_compile_options(

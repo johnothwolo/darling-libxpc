@@ -20,6 +20,15 @@ OS_OBJECT_NONLAZY_CLASS
 
 XPC_CLASS_HEADER(bundle);
 
++ (XPC_CLASS(bundle)*)mainBundle
+{
+	char* exec_path = xpc_copy_main_executable_path();
+	if (!exec_path) {
+		return NULL;
+	}
+	return [[[[self class] alloc] initWithPath: [XPC_CLASS(string) stringWithUTF8StringNoCopy: exec_path freeWhenDone: YES]] autorelease];
+}
+
 + (BOOL)pathIsBundleRoot: (XPC_CLASS(string)*)path
 {
 	// frameworks are special
@@ -361,11 +370,7 @@ xpc_object_t xpc_bundle_create_from_origin(unsigned int origin, const char* path
 XPC_EXPORT
 xpc_object_t xpc_bundle_create_main(void) {
 	@autoreleasepool {
-		char* exec_path = xpc_copy_main_executable_path();
-		if (!exec_path) {
-			return NULL;
-		}
-		return [[XPC_CLASS(bundle) alloc] initWithPath: [XPC_CLASS(string) stringWithUTF8StringNoCopy: exec_path freeWhenDone: YES]];
+		return [[XPC_CLASS(bundle) mainBundle] retain];
 	}
 };
 
