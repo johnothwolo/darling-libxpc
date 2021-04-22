@@ -1,3 +1,22 @@
+/**
+ * This file is part of Darling.
+ *
+ * Copyright (C) 2021 Darling developers
+ *
+ * Darling is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Darling is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Darling.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #import <xpc/xpc.h>
 #import <xpc/util.h>
 
@@ -90,7 +109,7 @@ void xpc_main(xpc_connection_handler_t handler) {
 			xpc_abort("failed to determine main bundle identifier");
 		}
 
-		server = [[XPC_CLASS(connection) alloc] initAsServerForService: identifier.UTF8String queue: NULL];
+		server = [[XPC_CLASS(connection) alloc] initAsServerForService: identifier.CString queue: NULL];
 		if (!server) {
 			xpc_abort("failed to create server connection");
 		}
@@ -115,7 +134,7 @@ void xpc_main(xpc_connection_handler_t handler) {
 			[server activate];
 		});
 
-		runloopType = runloop_name_to_type([XPC_CAST(dictionary, xpc_bundle_get_xpcservice_dictionary(mainBundle)) stringForKey: XPC_SERVICE_DICT_RUNLOOP_TYPE_KEY].UTF8String);
+		runloopType = runloop_name_to_type([XPC_CAST(dictionary, xpc_bundle_get_xpcservice_dictionary(mainBundle)) stringForKey: XPC_SERVICE_DICT_RUNLOOP_TYPE_KEY].CString);
 
 		switch (runloopType) {
 			case xpc_service_runloop_type_dispatch: {

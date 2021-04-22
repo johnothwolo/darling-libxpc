@@ -1,3 +1,22 @@
+/**
+ * This file is part of Darling.
+ *
+ * Copyright (C) 2021 Darling developers
+ *
+ * Darling is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Darling is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Darling.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef _XPC_UTIL_H_
 #define _XPC_UTIL_H_
 
@@ -24,7 +43,7 @@
  * @code
  * 	xpc_object_t some_input = get_some_input();
  * 	TO_OBJC_CHECKED(string, some_input, some_checked_input) {
- * 		printf("Yay! It's a string! Look: %s\n", some_checked_input.description.UTF8String); // note that this assumes NSString is loaded
+ * 		printf("Yay! It's a string! Look: %s\n", some_checked_input.description.CString); // note that this assumes NSString is loaded
  * 	} else {
  * 		printf("Oh no, you messed up and gave me an object that wasn't a string :(\n");
  * 	}
@@ -32,7 +51,7 @@
  */
 #define TO_OBJC_CHECKED(className, origName, objcName) \
 	XPC_CLASS(className)* objcName = XPC_CAST(className, origName); \
-	if (objcName && [objcName isKindOfClass: [XPC_CLASS(className) class]])
+	if ([objcName isKindOfClass: [XPC_CLASS(className) class]])
 
 /**
  * Like `TO_OBJC_CHECKED`, but the condition checks for failure to pass the checks.
@@ -41,7 +60,7 @@
  */
 #define TO_OBJC_CHECKED_ON_FAIL(className, origName, objcName) \
 	XPC_CLASS(className)* objcName = XPC_CAST(className, origName); \
-	if (!objcName || ![objcName isKindOfClass: [XPC_CLASS(className) class]])
+	if (![objcName isKindOfClass: [XPC_CLASS(className) class]])
 
 /**
  * Special `retain` variant for collection classes like dictionaries and arrays.

@@ -1,3 +1,22 @@
+/**
+ * This file is part of Darling.
+ *
+ * Copyright (C) 2021 Darling developers
+ *
+ * Darling is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Darling is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Darling.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #import <xpc/objects/string.h>
 #import <xpc/util.h>
 #import <xpc/xpc.h>
@@ -10,19 +29,19 @@ OS_OBJECT_NONLAZY_CLASS
 
 XPC_CLASS_HEADER(string);
 
-+ (instancetype)stringWithUTF8String: (const char*)string
++ (instancetype)stringWithCString: (const char*)string
 {
-	return [[[[self class] alloc] initWithUTF8String: string] autorelease];
+	return [[[[self class] alloc] initWithCString: string] autorelease];
 }
 
-+ (instancetype)stringWithUTF8String: (const char*)string byteLength: (NSUInteger)byteLength
++ (instancetype)stringWithCString: (const char*)string byteLength: (NSUInteger)byteLength
 {
-	return [[[[self class] alloc] initWithUTF8String: string byteLength: byteLength] autorelease];
+	return [[[[self class] alloc] initWithCString: string byteLength: byteLength] autorelease];
 }
 
-+ (instancetype)stringWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt
++ (instancetype)stringWithCStringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt
 {
-	return [[[[self class] alloc] initWithUTF8StringNoCopy: string freeWhenDone: freeIt] autorelease];
+	return [[[[self class] alloc] initWithCStringNoCopy: string freeWhenDone: freeIt] autorelease];
 }
 
 + (instancetype)stringWithFormat: (const char*)format, ...
@@ -46,8 +65,8 @@ XPC_CLASS_HEADER(string);
 - (char*)xpcDescription
 {
 	char* output = NULL;
-	if (self.UTF8String) {
-		asprintf(&output, "<%s: %s>", xpc_class_name(self), self.UTF8String);
+	if (self.CString) {
+		asprintf(&output, "<%s: %s>", xpc_class_name(self), self.CString);
 	} else {
 		asprintf(&output, "<%s: NULL>", xpc_class_name(self));
 	}
@@ -63,7 +82,7 @@ XPC_CLASS_HEADER(string);
 	return this->byteLength;
 }
 
-- (const char*)UTF8String
+- (const char*)CString
 {
 	XPC_THIS_DECL(string);
 	return this->string;
@@ -71,10 +90,10 @@ XPC_CLASS_HEADER(string);
 
 - (instancetype)init
 {
-	return [self initWithUTF8String: "" byteLength: 0];
+	return [self initWithCString: "" byteLength: 0];
 }
 
-- (instancetype)initWithUTF8String: (const char*)string byteLength: (NSUInteger)byteLength
+- (instancetype)initWithCString: (const char*)string byteLength: (NSUInteger)byteLength
 {
 	if (self = [super init]) {
 		XPC_THIS_DECL(string);
@@ -93,12 +112,12 @@ XPC_CLASS_HEADER(string);
 	return self;
 }
 
-- (instancetype)initWithUTF8String: (const char*)string
+- (instancetype)initWithCString: (const char*)string
 {
-	return [self initWithUTF8String: string byteLength: strlen(string)];
+	return [self initWithCString: string byteLength: strlen(string)];
 }
 
-- (instancetype)initWithUTF8StringNoCopy: (const char*)string byteLength: (NSUInteger)byteLength freeWhenDone: (BOOL)freeIt
+- (instancetype)initWithCStringNoCopy: (const char*)string byteLength: (NSUInteger)byteLength freeWhenDone: (BOOL)freeIt
 {
 	if (self = [super init]) {
 		XPC_THIS_DECL(string);
@@ -110,9 +129,9 @@ XPC_CLASS_HEADER(string);
 	return self;
 }
 
-- (instancetype)initWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt
+- (instancetype)initWithCStringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt
 {
-	return [self initWithUTF8StringNoCopy: string byteLength: strlen(string) freeWhenDone: freeIt];
+	return [self initWithCStringNoCopy: string byteLength: strlen(string) freeWhenDone: freeIt];
 }
 
 - (instancetype)initWithFormat: (const char*)format, ...
@@ -166,7 +185,7 @@ XPC_CLASS_HEADER(string);
 
 - (instancetype)forceCopy
 {
-	return [[[self class] alloc] initWithUTF8String: self.UTF8String];
+	return [[[self class] alloc] initWithCString: self.CString];
 }
 
 - (void)appendString: (const char*)string length: (NSUInteger)extraByteLength
@@ -199,12 +218,12 @@ XPC_CLASS_HEADER(string);
 
 - (XPC_CLASS(string)*)stringByAppendingString: (const char*)string
 {
-	return [[self class] stringWithFormat: "%s/%s", self.UTF8String, string];
+	return [[self class] stringWithFormat: "%s/%s", self.CString, string];
 }
 
 - (BOOL)isEqualToString: (const char*)string
 {
-	return strcmp(self.UTF8String, string) == 0;
+	return strcmp(self.CString, string) == 0;
 }
 
 @end
@@ -245,7 +264,7 @@ XPC_CLASS_HEADER(string);
 
 	// maybe we should check if the string length matches the reported length
 
-	result = [[[self class] alloc] initWithUTF8String: string];
+	result = [[[self class] alloc] initWithCString: string];
 
 	return result;
 
@@ -266,7 +285,7 @@ error_out:
 		goto error_out;
 	}
 
-	if (![serializer writeString: self.UTF8String]) {
+	if (![serializer writeString: self.CString]) {
 		goto error_out;
 	}
 
@@ -282,53 +301,53 @@ error_out:
 
 - (const char*)pathExtension
 {
-	char* lastDot = strrchr(self.UTF8String, '.');
+	char* lastDot = strrchr(self.CString, '.');
 	return lastDot ? lastDot + 1 : "";
 }
 
 - (const char*)lastPathComponent
 {
-	char* lastSlash = strrchr(self.UTF8String, '/');
+	char* lastSlash = strrchr(self.CString, '/');
 	return lastSlash ? lastSlash + 1 : "";
 }
 
 - (XPC_CLASS(string)*)stringByDeletingPathExtension
 {
-	char* lastDot = strrchr(self.UTF8String, '.');
-	return (lastDot) ? [[self class] stringWithUTF8String: self.UTF8String byteLength: lastDot - self.UTF8String] : [self forceCopy];
+	char* lastDot = strrchr(self.CString, '.');
+	return (lastDot) ? [[self class] stringWithCString: self.CString byteLength: lastDot - self.CString] : [self forceCopy];
 }
 
 - (XPC_CLASS(string)*)stringByResolvingSymlinksInPath
 {
-	char* resolved = realpath(self.UTF8String, NULL);
-	return resolved ? [[self class] stringWithUTF8StringNoCopy: resolved freeWhenDone: YES] : nil;
+	char* resolved = realpath(self.CString, NULL);
+	return resolved ? [[self class] stringWithCStringNoCopy: resolved freeWhenDone: YES] : nil;
 }
 
 - (XPC_CLASS(string)*)stringByAppendingPathComponent: (const char*)component
 {
 	if (self.byteLength == 0) {
-		return [[self class] stringWithUTF8String: component];
-	} else if (self.UTF8String[self.byteLength - 1] == '/') {
+		return [[self class] stringWithCString: component];
+	} else if (self.CString[self.byteLength - 1] == '/') {
 		return [self stringByAppendingString: component];
 	} else {
-		return [[self class] stringWithFormat: "%s/%s", self.UTF8String, component];
+		return [[self class] stringWithFormat: "%s/%s", self.CString, component];
 	}
 }
 
 - (XPC_CLASS(string)*)stringByDeletingLastPathComponent
 {
-	char* lastSlash = strrchr(self.UTF8String, '/');
-	if (lastSlash && lastSlash > self.UTF8String) {
+	char* lastSlash = strrchr(self.CString, '/');
+	if (lastSlash && lastSlash > self.CString) {
 		*lastSlash = '\0'; // temporarily shorten the string for the copy...
-		XPC_CLASS(string)* result = [[self class] stringWithUTF8String: self.UTF8String];
+		XPC_CLASS(string)* result = [[self class] stringWithCString: self.CString];
 		*lastSlash = '/'; // ...and then restore it
 		return result;
-	} else if (lastSlash == self.UTF8String) {
+	} else if (lastSlash == self.CString) {
 		// if it's the one for the root, return the root
-		return [[self class] stringWithUTF8String: "/"];
+		return [[self class] stringWithCString: "/"];
 	} else {
 		// otherwise, if it's not present, return an empty string
-		return [[self class] stringWithUTF8String: ""];
+		return [[self class] stringWithCString: ""];
 	}
 }
 
@@ -340,7 +359,7 @@ error_out:
 
 XPC_EXPORT
 xpc_object_t xpc_string_create(const char* string) {
-	return [[XPC_CLASS(string) alloc] initWithUTF8String: string];
+	return [[XPC_CLASS(string) alloc] initWithCString: string];
 };
 
 XPC_EXPORT
@@ -368,7 +387,7 @@ size_t xpc_string_get_length(xpc_object_t xstring) {
 XPC_EXPORT
 const char* xpc_string_get_string_ptr(xpc_object_t xstring) {
 	TO_OBJC_CHECKED(string, xstring, string) {
-		return string.UTF8String;
+		return string.CString;
 	}
 	return NULL;
 };
@@ -386,5 +405,5 @@ void _xpc_string_set_value(xpc_object_t xstring, const char* new_string) {
 
 XPC_EXPORT
 xpc_object_t xpc_string_create_no_copy(const char* string) {
-	return [[XPC_CLASS(string) alloc] initWithUTF8StringNoCopy: string freeWhenDone: NO];
+	return [[XPC_CLASS(string) alloc] initWithCStringNoCopy: string freeWhenDone: NO];
 };

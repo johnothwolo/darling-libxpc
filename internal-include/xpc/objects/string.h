@@ -1,3 +1,22 @@
+/**
+ * This file is part of Darling.
+ *
+ * Copyright (C) 2021 Darling developers
+ *
+ * Darling is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Darling is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Darling.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef _XPC_OBJECTS_STRING_H_
 #define _XPC_OBJECTS_STRING_H_
 
@@ -15,26 +34,26 @@ struct xpc_string_s {
 
 @interface XPC_CLASS_INTERFACE(string)
 
-// this API is modeled after NSString
+// this API is modeled after NSString (except with CString instead of UTF8String)
 
 // non-NSString property; length of the string in bytes, not including the null terminator
 @property(readonly) NSUInteger byteLength;
-@property(readonly) const char* UTF8String;
+@property(readonly) const char* CString;
 
-+ (instancetype)stringWithUTF8String: (const char*)string;
++ (instancetype)stringWithCString: (const char*)string;
 // non-NSString method
-+ (instancetype)stringWithUTF8String: (const char*)string byteLength: (NSUInteger)byteLength;
++ (instancetype)stringWithCString: (const char*)string byteLength: (NSUInteger)byteLength;
 // non-NSString method
-+ (instancetype)stringWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt;
++ (instancetype)stringWithCStringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt;
 + (instancetype) XPC_PRINTF(1, 2) stringWithFormat: (const char*)format, ...;
 
 // non-NSString method
-- (instancetype)initWithUTF8String: (const char*)string byteLength: (NSUInteger)byteLength;
-- (instancetype)initWithUTF8String: (const char*)string;
+- (instancetype)initWithCString: (const char*)string byteLength: (NSUInteger)byteLength;
+- (instancetype)initWithCString: (const char*)string;
 // non-NSString method
-- (instancetype)initWithUTF8StringNoCopy: (const char*)string byteLength: (NSUInteger)byteLength freeWhenDone: (BOOL)freeIt;
+- (instancetype)initWithCStringNoCopy: (const char*)string byteLength: (NSUInteger)byteLength freeWhenDone: (BOOL)freeIt;
 // non-NSString method
-- (instancetype)initWithUTF8StringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt;
+- (instancetype)initWithCStringNoCopy: (const char*)string freeWhenDone: (BOOL)freeIt;
 - (instancetype) XPC_PRINTF(1, 2) initWithFormat: (const char*)format, ...;
 - (instancetype) XPC_PRINTF(1, 0) initWithFormat: (const char*)format arguments: (va_list)args;
 

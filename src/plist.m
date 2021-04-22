@@ -1,3 +1,22 @@
+/**
+ * This file is part of Darling.
+ *
+ * Copyright (C) 2021 Darling developers
+ *
+ * Darling is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Darling is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Darling.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #import <xpc/plist.h>
 #import <xpc/objects/string.h>
 #import <xpc/objects/dictionary.h>
@@ -276,7 +295,7 @@ XPC_CLASS_HEADER(plist_xml_element);
 			dispatch_data_t dispatchData = NULL;
 			XPC_CLASS(data)* xpcData = nil;
 
-			temp = dispatch_data_create(string.UTF8String, string.byteLength, NULL, DISPATCH_DATA_DESTRUCTOR_NONE);
+			temp = dispatch_data_create(string.CString, string.byteLength, NULL, DISPATCH_DATA_DESTRUCTOR_NONE);
 			if (!temp) {
 				goto data_error;
 			}
@@ -316,7 +335,7 @@ XPC_CLASS_HEADER(plist_xml_element);
 
 			// not using strptime because that aborts the whole thing if parts are missing;
 			// we need to be able to optionally omit components (which sscanf supports)
-			sscanf(string.UTF8String ? string.UTF8String : "", "%d-%d-%dT%d:%d:%dZ", &time.tm_year, &time.tm_mon, &time.tm_mday, &time.tm_hour, &time.tm_min, &time.tm_sec);
+			sscanf(string.CString ? string.CString : "", "%d-%d-%dT%d:%d:%dZ", &time.tm_year, &time.tm_mon, &time.tm_mday, &time.tm_hour, &time.tm_min, &time.tm_sec);
 			if (time.tm_year > 0) {
 				time.tm_year -= 1900;
 			}
@@ -330,14 +349,14 @@ XPC_CLASS_HEADER(plist_xml_element);
 
 		case xpc_plist_xml_element_type_real: {
 			XPC_CLASS(string)* string = XPC_CAST(string, this->object);
-			double value = atof(string.UTF8String);
+			double value = atof(string.CString);
 			[this->object release];
 			this->object = [[XPC_CLASS(double) alloc] initWithValue: value];
 		} break;
 
 		case xpc_plist_xml_element_type_integer: {
 			XPC_CLASS(string)* string = XPC_CAST(string, this->object);
-			int64_t value = atoll(string.UTF8String);
+			int64_t value = atoll(string.CString);
 			[this->object release];
 			this->object = [[XPC_CLASS(int64) alloc] initWithValue: value];
 		} break;
@@ -387,7 +406,7 @@ handover_to_parent:
 				self.cache = XPC_CAST(string, child.object);
 			} else {
 				xpc_assert(self.cache);
-				[XPC_CAST(dictionary, this->object) setObject: child.object forKey: self.cache.UTF8String];
+				[XPC_CAST(dictionary, this->object) setObject: child.object forKey: self.cache.CString];
 				self.cache = nil;
 			}
 		} break;
@@ -847,7 +866,7 @@ XPC_CLASS_HEADER(plist_binary_v0_deserializer);
 	if (length == NSUIntegerMax) {
 		return nil;
 	}
-	return [[XPC_CLASS(string) alloc] initWithUTF8String: (const char*)bytes byteLength: length];
+	return [[XPC_CLASS(string) alloc] initWithCString: (const char*)bytes byteLength: length];
 }
 
 - (XPC_CLASS(string)*)readUTF16String: (const uint8_t*)object
@@ -865,7 +884,7 @@ XPC_CLASS_HEADER(plist_binary_v0_deserializer);
 	data = dispatch_data_create(bytes, length, NULL, DISPATCH_DATA_DESTRUCTOR_NONE);
 	// how nice of them to have something specifically for this purpose :)
 	transformed = dispatch_data_create_with_transform(data, DISPATCH_DATA_FORMAT_TYPE_UTF16BE, DISPATCH_DATA_FORMAT_TYPE_UTF8);
-	result = [[XPC_CLASS(string) alloc] initWithUTF8String: dispatch_data_get_flattened_bytes_4libxpc(transformed) byteLength: dispatch_data_get_size(transformed)];
+	result = [[XPC_CLASS(string) alloc] initWithCString: dispatch_data_get_flattened_bytes_4libxpc(transformed) byteLength: dispatch_data_get_size(transformed)];
 	[transformed release];
 	[data release];
 
@@ -950,7 +969,7 @@ XPC_CLASS_HEADER(plist_binary_v0_deserializer);
 		XPC_CLASS(object)* key = [self readObject: keyReferenceNumber];
 		XPC_CLASS(object)* value = [self readObject: valueReferenceNumber];
 		TO_OBJC_CHECKED(string, key, keyString) {
-			[result setObject: value forKey: keyString.UTF8String];
+			[result setObject: value forKey: keyString.CString];
 		}
 		[key release];
 		[value release];

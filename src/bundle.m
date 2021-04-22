@@ -1,3 +1,22 @@
+/**
+ * This file is part of Darling.
+ *
+ * Copyright (C) 2021 Darling developers
+ *
+ * Darling is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Darling is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Darling.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #import <xpc/objects/bundle.h>
 #import <xpc/objects/string.h>
 #import <xpc/objects/dictionary.h>
@@ -26,7 +45,7 @@ XPC_CLASS_HEADER(bundle);
 	if (!exec_path) {
 		return NULL;
 	}
-	return [[[[self class] alloc] initWithPath: [XPC_CLASS(string) stringWithUTF8StringNoCopy: exec_path freeWhenDone: YES]] autorelease];
+	return [[[[self class] alloc] initWithPath: [XPC_CLASS(string) stringWithCStringNoCopy: exec_path freeWhenDone: YES]] autorelease];
 }
 
 + (BOOL)pathIsBundleRoot: (XPC_CLASS(string)*)path
@@ -36,11 +55,11 @@ XPC_CLASS_HEADER(bundle);
 	// in either case, however, we can tell if it's the bundle root if it contains an Info.plist (it's required for all bundles).
 	// the difference is just in whether it's directly in the root or in a `Contents` directory.
 	if (strcmp(path.pathExtension, "framework") == 0) {
-		if (xpc_path_is_file([path stringByAppendingPathComponent: "Info.plist"].UTF8String)) {
+		if (xpc_path_is_file([path stringByAppendingPathComponent: "Info.plist"].CString)) {
 			return YES;
 		}
 	} else {
-		if (xpc_path_is_file([path stringByAppendingPathComponent: "Contents/Info.plist"].UTF8String)) {
+		if (xpc_path_is_file([path stringByAppendingPathComponent: "Contents/Info.plist"].CString)) {
 			return YES;
 		}
 	}
@@ -158,7 +177,7 @@ XPC_CLASS_HEADER(bundle);
 
 - (XPC_CLASS(string)*)pathForResource: (const char*)name ofType: (const char*)type
 {
-	return [XPC_CLASS(string) stringWithFormat: "%s/%s.%s", self.bundlePath.UTF8String, name, type];
+	return [XPC_CLASS(string) stringWithFormat: "%s/%s.%s", self.bundlePath.CString, name, type];
 }
 
 - (XPC_CLASS(string)*)pathForSubdirectoryOfType: (xpc_bundle_subdirectory_type_t)type
@@ -184,7 +203,7 @@ XPC_CLASS_HEADER(bundle);
 		result = [[[self.infoDictionary stringForKey: "NSExecutable"] retain] autorelease];
 		if (!result) {
 			// finally, if all else fails, try to use the same name as the bundle
-			result = [[XPC_CLASS(string) stringWithUTF8String: self.bundlePath.lastPathComponent] stringByDeletingPathExtension];
+			result = [[XPC_CLASS(string) stringWithCString: self.bundlePath.lastPathComponent] stringByDeletingPathExtension];
 		}
 	}
 
@@ -215,11 +234,11 @@ XPC_CLASS_HEADER(bundle);
 
 		// cache the executable path
 		executableDirTmp = (self.isFramework) ? self.bundlePath : [self.bundlePath stringByAppendingPathComponent: "Contents/MacOS"];
-		self.executablePath = [[executableDirTmp stringByAppendingPathComponent: [self resolveExecutableName].UTF8String] stringByResolvingSymlinksInPath];
+		self.executablePath = [[executableDirTmp stringByAppendingPathComponent: [self resolveExecutableName].CString] stringByResolvingSymlinksInPath];
 
 		// resolve XPC services
 		this->services = [XPC_CLASS(array) new];
-		xpcServicesDir = opendir(xpcServicesPath.UTF8String);
+		xpcServicesDir = opendir(xpcServicesPath.CString);
 		if (xpcServicesDir) {
 			while ((xpcServiceDirent = readdir(xpcServicesDir))) {
 				@autoreleasepool {
@@ -246,11 +265,11 @@ XPC_CLASS_HEADER(bundle);
 	void* buffer = NULL;
 	xpc_object_t plist = NULL;
 
-	if (!xpc_path_is_file(self.infoPath.UTF8String)) {
+	if (!xpc_path_is_file(self.infoPath.CString)) {
 		// no Info.plist; let's continue the resolution with an empty plist
 		plist = [XPC_CLASS(dictionary) new];
 	} else {
-		fd = open(self.infoPath.UTF8String, O_RDONLY);
+		fd = open(self.infoPath.CString, O_RDONLY);
 
 		if (fd < 0) {
 			self.error = xpc_bundle_error_failed_to_read_plist;
@@ -291,7 +310,7 @@ XPC_CLASS_HEADER(bundle);
 {
 	int fd = -1;
 
-	if (!xpc_path_is_file(self.infoPath.UTF8String)) {
+	if (!xpc_path_is_file(self.infoPath.CString)) {
 		// no Info.plist; let's continue the resolution with an empty plist
 		callback = Block_copy(callback);
 		dispatch_async(resolutionQueue, ^{
@@ -304,7 +323,7 @@ XPC_CLASS_HEADER(bundle);
 		return;
 	}
 
-	fd = open(self.infoPath.UTF8String, O_RDONLY);
+	fd = open(self.infoPath.CString, O_RDONLY);
 
 	if (fd < 0) {
 		self.error = xpc_bundle_error_failed_to_read_plist;
@@ -340,7 +359,7 @@ char* xpc_bundle_copy_resource_path(xpc_object_t xbundle, const char* name, cons
 	TO_OBJC_CHECKED(bundle, xbundle, bundle) {
 		@autoreleasepool {
 			XPC_CLASS(string)* path = [bundle pathForResource: name ofType: type];
-			return path ? strdup(path.UTF8String) : NULL;
+			return path ? strdup(path.CString) : NULL;
 		}
 	}
 	return NULL;
@@ -356,14 +375,14 @@ xpc_object_t xpc_bundle_copy_services(xpc_object_t xbundle) {
 XPC_EXPORT
 xpc_object_t xpc_bundle_create(const char* path, unsigned int flags) {
 	@autoreleasepool {
-		return [[XPC_CLASS(bundle) alloc] initWithPath: [XPC_CLASS(string) stringWithUTF8String: path]];
+		return [[XPC_CLASS(bundle) alloc] initWithPath: [XPC_CLASS(string) stringWithCString: path]];
 	}
 };
 
 XPC_EXPORT
 xpc_object_t xpc_bundle_create_from_origin(unsigned int origin, const char* path) {
 	@autoreleasepool {
-		return [[XPC_CLASS(bundle) alloc] initWithPath: [XPC_CLASS(string) stringWithUTF8String: path]];
+		return [[XPC_CLASS(bundle) alloc] initWithPath: [XPC_CLASS(string) stringWithCString: path]];
 	}
 };
 
@@ -385,7 +404,7 @@ int xpc_bundle_get_error(xpc_object_t xbundle) {
 XPC_EXPORT
 const char* xpc_bundle_get_executable_path(xpc_object_t xbundle) {
 	TO_OBJC_CHECKED(bundle, xbundle, bundle) {
-		return bundle.executablePath.UTF8String;
+		return bundle.executablePath.CString;
 	}
 	return NULL;
 };
@@ -401,7 +420,7 @@ xpc_object_t xpc_bundle_get_info_dictionary(xpc_object_t xbundle) {
 XPC_EXPORT
 const char* xpc_bundle_get_path(xpc_object_t xbundle) {
 	TO_OBJC_CHECKED(bundle, xbundle, bundle) {
-		return bundle.bundlePath.UTF8String;
+		return bundle.bundlePath.CString;
 	}
 	return NULL;
 };
