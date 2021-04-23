@@ -206,7 +206,9 @@ XPC_TYPE(_xpc_type_activity);
  * eligible to run, its execution state will be updated and an invocation of
  * its handler block will be made.
  */
+XPC_IGNORE_DUPLICATE_PROTOCOL_PUSH;
 XPC_DECL(xpc_activity);
+XPC_IGNORE_DUPLICATE_PROTOCOL_POP;
 
 /*!
  * @typedef xpc_activity_handler_t
