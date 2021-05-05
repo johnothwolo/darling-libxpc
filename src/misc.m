@@ -24,6 +24,24 @@
 #import <dispatch/mach_private.h>
 #import <os/voucher_private.h>
 
+#include <sys/sysctl.h>
+
+struct os_system_version {
+	unsigned int major;
+	unsigned int minor;
+	unsigned int patch;
+};
+
+XPC_EXPORT
+struct os_system_version _system_version_fallback = {
+	.major = 10,
+	.minor = 15,
+	.patch = 0,
+};
+
+static struct os_system_version current_version = {0};
+static dispatch_once_t current_version_once;
+
 XPC_EXPORT
 bool _availability_version_check(size_t version_count, dyld_build_version_t* versions) {
 	// i'm *pretty* sure the second argument is an array of `dyld_build_version_t`
@@ -43,26 +61,41 @@ bool _system_version_copy_string_plist(char* out_string) {
 	return false;
 };
 
+// provided string MUST have at least 48 characters
 XPC_EXPORT
 bool _system_version_copy_string_sysctl(char* out_string) {
-	xpc_stub();
-	return false;
-};
-
-XPC_EXPORT uint32_t _system_version_fallback[] = { 10, 15, 0 };
-
-XPC_EXPORT
-bool _system_version_parse_string(const char* string, uint32_t* out_version) {
-	// `version` is an array of 3 `uint32_t`s (or `int`s)
-	xpc_stub();
-	return false;
+	size_t out_string_length = 48;
+	return sysctlbyname("kern.osproductversion", out_string, &out_string_length, NULL, 0) == 0;
 };
 
 XPC_EXPORT
-int os_system_version_get_current_version(uint32_t* out_version) {
-	// parameter 1's type is a good guess, but i'm unsure
-	xpc_stub();
-	return -1;
+bool _system_version_parse_string(const char* string, struct os_system_version* out_version) {
+	sscanf(string, "%u.%u.%u", &out_version->major, &out_version->minor, &out_version->patch);
+	return true;
+};
+
+XPC_EXPORT
+int os_system_version_get_current_version(struct os_system_version* out_version) {
+	dispatch_once(&current_version_once, ^{
+		char version_string[48] = {0};
+
+		if (!_system_version_copy_string_sysctl(version_string)) {
+			goto fallback;
+		}
+
+		if (!_system_version_parse_string(version_string, &current_version)) {
+			goto fallback;
+		}
+
+		return;
+
+	fallback:
+		memcpy(&current_version, &_system_version_fallback, sizeof(struct os_system_version));
+	});
+
+	memcpy(out_version, &current_version, sizeof(struct os_system_version));
+
+	return 0;
 };
 
 XPC_EXPORT
