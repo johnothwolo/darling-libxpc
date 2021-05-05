@@ -21,19 +21,14 @@
 #import <objc/runtime.h>
 #import <xpc/serialization.h>
 #include <sys/reason.h>
-#include <sys/syslog.h>
 #import <xpc/objects/connection.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <mach-o/dyld.h>
 
-#ifndef XPC_LOG_TO_STDOUT_TOO
-	#define XPC_LOG_TO_STDOUT_TOO 0
-#endif
-
 static bool enable_stub_messages = false;
 
-static bool enable_syslog(void) {
+bool xpc_should_log(void) {
 	static bool enabled = true;
 	static dispatch_once_t onceToken;
 
@@ -251,28 +246,6 @@ void _xpc_assertion_failed(const char* function, const char* file, size_t line, 
 	_xpc_abort(function, file, line, "assertion failed: %s", expression);
 };
 
-void _xpc_logv(const char* function, const char* file, size_t line, xpc_log_priority_t priority, const char* format, va_list args) {
-	char* message = NULL;
-	char* reason = NULL;
-	vasprintf(&reason, format, args);
-#if XPC_LOG_TO_STDOUT_TOO
-	// also log to stdout
-	printf("libxpc: %s:%zu: %s: %s\n", file, line, function, reason);
-	fflush(stdout);
-#endif
-	if (enable_syslog()) {
-		syslog(priority, "libxpc: %s:%zu: %s: %s", file, line, function, reason);
-	}
-	free(reason);
-};
-
-void _xpc_log(const char* function, const char* file, size_t line, xpc_log_priority_t priority, const char* format, ...) {
-	va_list args;
-	va_start(args, format);
-	_xpc_logv(function, file, line, priority, format, args);
-	va_end(args);
-};
-
 void xpc_stub_init(void) {
 	enable_stub_messages = getenv("STUB_VERBOSE") != NULL;
 };
@@ -309,4 +282,13 @@ retry:
 
 out:
 	return result;
+};
+
+os_log_t xpc_get_log(void) {
+	static os_log_t logger = NULL;
+	static dispatch_once_t token;
+	dispatch_once(&token, ^{
+		logger = os_log_create("org.darlinghq.libxpc", "general");
+	});
+	return logger;
 };

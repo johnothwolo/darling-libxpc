@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <mach/mach.h>
-#include <sys/syslog.h>
+#include <os/log.h>
 
 /**
  * Expands to an expression that evaluates to `true` if the given expression is an object of the given XPC class, or `false` otherwise.
@@ -253,35 +253,32 @@ void _xpc_assertion_failed(const char* function, const char* file, size_t line, 
 	#define xpc_assert(x)
 #endif
 
-#define XPC_LOG_DEBUG   LOG_DEBUG
-#define XPC_LOG_WARNING LOG_WARNING
-#define XPC_LOG_ERROR   LOG_ERR
-#define XPC_LOG_NOTICE  LOG_NOTICE
-#define XPC_LOG_INFO    LOG_INFO
+#define XPC_LOG_DEBUG   OS_LOG_TYPE_DEBUG
+#define XPC_LOG_WARNING OS_LOG_TYPE_INFO
+#define XPC_LOG_ERROR   OS_LOG_TYPE_ERROR
+#define XPC_LOG_NOTICE  OS_LOG_TYPE_INFO
+#define XPC_LOG_INFO    OS_LOG_TYPE_INFO
 
-typedef int xpc_log_priority_t;
+/**
+ * Determines whether logging should be allowed right now.
+ *
+ * This is necessary to avoid logging in places that could cause a deadlock.
+ */
+bool xpc_should_log(void);
+
+/**
+ * Returns a logger object that can be used for logging XPC messages with os_log
+ */
+os_log_t xpc_get_log(void);
 
 /**
  * Logs a message with the given priority.
  */
-XPC_PRINTF(5, 6)
-void _xpc_log(const char* function, const char* file, size_t line, xpc_log_priority_t priority, const char* format, ...);
-
-/**
- * @see _xpc_log
- */
-XPC_PRINTF(5, 0)
-void _xpc_logv(const char* function, const char* file, size_t line, xpc_log_priority_t priority, const char* format, va_list args);
-
-/**
- * Logs a message with the given priority. This macro automatically fills in most of the arguments to `_xpc_log`.
- */
-#define xpc_log(...) _xpc_log(__PRETTY_FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
-
-/**
- * @see xpc_log
- */
-#define xpc_logv(...) _xpc_logv(__PRETTY_FUNCTION__, __FILE__, __LINE__, __VA_ARGS__)
+#define xpc_log(type, format, ...) ({ \
+		if (xpc_should_log()) { \
+			os_log_with_type(xpc_get_log(), type, "%s:%lu: %s: " format, __FILE__, (long unsigned)__LINE__, __PRETTY_FUNCTION__, ##__VA_ARGS__); \
+		} \
+	})
 
 /**
  * Prints a message indicating that a stub was called.

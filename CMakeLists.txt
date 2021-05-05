@@ -88,6 +88,7 @@ add_circular(xpc
 		unwind
 		compiler_rt
 		system_pthread
+		system_trace
 	UPWARD
 		# break an upward dependency on libobjc
 		# ---
