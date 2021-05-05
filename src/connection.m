@@ -235,6 +235,13 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 			this->is_cancelled = true;
 			[self.parentServer removeServerPeer: self]; // server peers should unregister themselves from their parent servers
 			xpc_log(XPC_LOG_DEBUG, "connection %p: cancelled", self);
+
+			this->event_handler(XPC_ERROR_CONNECTION_INVALID);
+
+			// we're never going to call the event handler again, so release it;
+			// if they were holding a reference on us, it gets released
+			Block_release(this->event_handler);
+			this->event_handler = NULL;
 		} break;
 
 		case DISPATCH_MACH_DISCONNECTED: {
@@ -271,7 +278,6 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 			if (this->is_server_peer || !this->service_name) {
 				// server peers and clients of anonymous servers cannot reconnect
 				dispatch_mach_cancel(this->mach_ctx);
-				this->event_handler(XPC_ERROR_CONNECTION_INVALID);
 			} else if (this->service_name) {
 				// client of named server
 				// we can reconnect
