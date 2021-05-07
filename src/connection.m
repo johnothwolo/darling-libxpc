@@ -365,6 +365,17 @@ static void dmxh_async_reply_handler(void* self_context, dispatch_mach_reason_t 
 				[self setRemoteCredentials: token];
 			}
 
+			if (header->msgh_size == sizeof(mach_msg_header_t)) {
+				// if the message is only a header, it means that the remote peer disconnected/crashed
+				mach_msg_destroy(header);
+				if (this->service_name) {
+					result = XPC_ERROR_CONNECTION_INTERRUPTED;
+				} else {
+					result = XPC_ERROR_CONNECTION_INVALID;
+				}
+				goto handle_it;
+			}
+
 			[message retain]; // because the deserializer consumes a reference on the message
 			result = [XPC_CLASS(deserializer) process: message];
 			if (!result) {
@@ -387,6 +398,7 @@ static void dmxh_async_reply_handler(void* self_context, dispatch_mach_reason_t 
 		} break;
 	}
 
+handle_it:
 	context->handler(result);
 
 	xpc_connection_reply_context_destroy(context);
@@ -925,6 +937,7 @@ error_out:
 	XPC_THIS_DECL(connection);
 	dispatch_mach_msg_t reply = NULL;
 	XPC_CLASS(dictionary)* result = nil;
+	mach_msg_header_t* header = NULL;
 
 	@autoreleasepool {
 		XPC_CLASS(serializer)* serializer = [XPC_CLASS(serializer) serializer];
@@ -950,6 +963,18 @@ error_out:
 	}
 
 	if (!reply) {
+		if (this->service_name) {
+			return XPC_ERROR_CONNECTION_INTERRUPTED;
+		} else {
+			return XPC_ERROR_CONNECTION_INVALID;
+		}
+	}
+
+	header = dispatch_mach_msg_get_msg(reply, NULL);
+
+	if (header->msgh_size == sizeof(mach_msg_header_t)) {
+		// if the message is only a header, it means that the remote peer disconnected/crashed
+		mach_msg_destroy(header);
 		if (this->service_name) {
 			return XPC_ERROR_CONNECTION_INTERRUPTED;
 		} else {
@@ -1257,9 +1282,9 @@ void xpc_connection_kill(xpc_connection_t xconn, int signal) {
 };
 
 XPC_EXPORT
-
 void xpc_connection_send_notification(xpc_connection_t xconn, xpc_object_t details) {
-	xpc_stub();
+	// TODO: proper no-importance sending
+	xpc_connection_send_message(xconn, details);
 };
 
 XPC_EXPORT
