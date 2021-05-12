@@ -103,10 +103,12 @@ static bool handle_send_result(dispatch_mach_msg_t message, dispatch_mach_reason
 			return true;
 		} break;
 
+		case DISPATCH_MACH_MESSAGE_NOT_SENT: /* fallthrough */
 		case DISPATCH_MACH_MESSAGE_SEND_FAILED: {
 			xpc_log_debug(connection, "message%s failed to be sent: err = %d", expecting_reply ? " expecting reply" : "", sendError);
 
 			switch (sendError) {
+				case 0: /* fallthrough (occurs with DISPATCH_MACH_MESSAGE_NOT_SENT) */
 				case MACH_SEND_NO_BUFFER: /* fallthrough */
 				case MACH_SEND_INVALID_DATA: /* fallthrough */
 				case MACH_SEND_INVALID_HEADER: /* fallthrough */
