@@ -41,6 +41,8 @@
 
 #define XPC_PACKAGE_TYPE "XPC!"
 
+XPC_LOGGER_DEF(runtime);
+
 OS_ENUM(xpc_service_runloop_type, uint8_t,
 	xpc_service_runloop_type_invalid,
 	xpc_service_runloop_type_dispatch,
@@ -120,7 +122,7 @@ void xpc_main(xpc_connection_handler_t handler) {
 				handler(XPC_CAST(connection, object));
 			} else if (type == (xpc_type_t)XPC_TYPE_ERROR) {
 				if (object == XPC_ERROR_TERMINATION_IMMINENT) {
-					xpc_log(XPC_LOG_WARNING, "someone wants us to terminate");
+					xpc_log(runtime, "someone wants us to terminate");
 				} else {
 					xpc_abort("unexpected error receive in managed server event handler: %s", xpc_copy_description(object));
 				}

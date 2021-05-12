@@ -35,6 +35,8 @@ XPC_GENARR_DEF(connection, XPC_CLASS(connection)*, /* non-static */);
 XPC_GENARR_SEARCH_DEF(connection, XPC_CLASS(connection)*, /* non-static */);
 XPC_GENARR_BLOCKS_DEF(connection, XPC_CLASS(connection)*, /* non-static */);
 
+XPC_LOGGER_DEF(connection);
+
 static const char* reason_map[] = {
 	"first (invalid)",
 	"connected",
@@ -63,7 +65,7 @@ static const char* reason_to_string(dispatch_mach_reason_t reason) {
 static void server_peer_array_item_dtor(XPC_CLASS(connection)** serverPeer) {
 	(*serverPeer).parentServer = nil; // so the server peer doesn't try to remove itself
 	[*serverPeer cancel];
-	_os_object_release_internal(*serverPeer);
+	[*serverPeer release];
 };
 
 static xpc_connection_reply_context_t* xpc_connection_reply_context_create(xpc_handler_t handler, dispatch_queue_t queue) {
@@ -76,13 +78,13 @@ static xpc_connection_reply_context_t* xpc_connection_reply_context_create(xpc_h
 	context->handler = Block_copy(handler);
 	context->queue = [queue retain];
 
-	xpc_log(XPC_LOG_DEBUG, "created reply context %p (with handler %p and queue %p)", context, context->handler, context->queue);
+	xpc_log_debug(connection, "created reply context %p (with handler %p and queue %p)", context, context->handler, context->queue);
 
 	return context;
 };
 
 static void xpc_connection_reply_context_destroy(xpc_connection_reply_context_t* context) {
-	xpc_log(XPC_LOG_DEBUG, "destroying reply context %p (with handler %p and queue %p)", context, context->handler, context->queue);
+	xpc_log_debug(connection, "destroying reply context %p (with handler %p and queue %p)", context, context->handler, context->queue);
 	Block_release(context->handler);
 	[context->queue release];
 	free(context);
@@ -92,17 +94,17 @@ static void xpc_connection_reply_context_destroy(xpc_connection_reply_context_t*
 static bool handle_send_result(dispatch_mach_msg_t message, dispatch_mach_reason_t sendResult, mach_error_t sendError, bool expecting_reply) {
 	switch (sendResult) {
 		case DISPATCH_MACH_MESSAGE_SENT: {
-			xpc_log(XPC_LOG_DEBUG, "message%s successfully sent", expecting_reply ? " expecting reply" : "");
+			xpc_log_debug(connection, "message%s successfully sent", expecting_reply ? " expecting reply" : "");
 			return true;
 		} break;
 
 		case DISPATCH_MACH_NEEDS_DEFERRED_SEND: {
-			xpc_log(XPC_LOG_DEBUG, "message%s needs to be sent later", expecting_reply ? " expecting reply" : "");
+			xpc_log_debug(connection, "message%s needs to be sent later", expecting_reply ? " expecting reply" : "");
 			return true;
 		} break;
 
 		case DISPATCH_MACH_MESSAGE_SEND_FAILED: {
-			xpc_log(XPC_LOG_ERROR, "message%s failed to be sent: err = %d", expecting_reply ? " expecting reply" : "", sendError);
+			xpc_log_debug(connection, "message%s failed to be sent: err = %d", expecting_reply ? " expecting reply" : "", sendError);
 
 			switch (sendError) {
 				case MACH_SEND_NO_BUFFER: /* fallthrough */
@@ -127,11 +129,11 @@ static bool handle_send_result(dispatch_mach_msg_t message, dispatch_mach_reason
 				case MACH_SEND_MSG_TOO_SMALL: {
 					// these are hard to clean up because the message may have been partially consumed by the kernel,
 					// so we just don't clean them up
-					xpc_log(XPC_LOG_WARNING, "message%s could not be cleaned up", expecting_reply ? " expecting reply" : "");
+					xpc_log_info(connection, "message%s could not be cleaned up", expecting_reply ? " expecting reply" : "");
 				} break;
 
 				default: {
-					xpc_log(XPC_LOG_WARNING, "unexpected error for message%s: %d", expecting_reply ? " expecting reply" : "", sendError);
+					xpc_log_error(connection, "unexpected error for message%s: %d", expecting_reply ? " expecting reply" : "", sendError);
 				} break;
 			}
 		} break;
@@ -157,7 +159,7 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 	XPC_CLASS(connection)* self = context;
 	XPC_THIS_DECL(connection);
 
-	xpc_log(XPC_LOG_DEBUG, "connection %p: handler got event %lu (%s)\n", self, reason, reason_to_string(reason));
+	xpc_log_debug(connection, "connection %p: handler got event %lu (%s)\n", self, reason, reason_to_string(reason));
 
 	switch (reason) {
 		case DISPATCH_MACH_MESSAGE_RECEIVED: {
@@ -171,7 +173,7 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 				audit_token_t* token = NULL;
 
 				if (header->msgh_id != XPC_MSGH_ID_CHECKIN) {
-					xpc_log(XPC_LOG_NOTICE, "server connection received non-checkin message");
+					xpc_log_fault(connection, "server connection received non-checkin message");
 					mach_msg_destroy(header);
 					return;
 				}
@@ -190,7 +192,7 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 				}
 
 				if (!MACH_PORT_VALID(sendPort) || !MACH_PORT_VALID(receivePort)) {
-					xpc_log(XPC_LOG_NOTICE, "peer died before their checkin message went through");
+					xpc_log(connection, "peer died before their checkin message went through");
 					mach_msg_destroy(header);
 					return;
 				}
@@ -207,7 +209,7 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 				audit_token_t* token = NULL;
 
 				if (header->msgh_id != XPC_MSGH_ID_MESSAGE) {
-					xpc_log(XPC_LOG_NOTICE, "peer connection received non-normal message in normal event handler");
+					xpc_log_fault(connection, "peer connection received non-normal message in normal event handler");
 					mach_msg_destroy(header);
 					return;
 				}
@@ -228,13 +230,16 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 
 		case DISPATCH_MACH_CONNECTED: {
 			// this event is sent even when we get (re)connected
-			xpc_log(XPC_LOG_DEBUG, "connection %p: connected (with send port %u and receive port %u)", self, this->send_port, this->recv_port);
+			xpc_log_debug(connection, "connection %p: connected (with send port %u and receive port %u)", self, this->send_port, this->recv_port);
 		} break;
 
 		case DISPATCH_MACH_CANCELED: {
+			// we should only ever receive a single DISPATCH_MACH_CANCELED event
+			xpc_assert(!this->is_cancelled);
+
 			this->is_cancelled = true;
 			[self.parentServer removeServerPeer: self]; // server peers should unregister themselves from their parent servers
-			xpc_log(XPC_LOG_DEBUG, "connection %p: cancelled", self);
+			xpc_log_debug(connection, "connection %p: cancelled", self);
 
 			this->event_handler(XPC_ERROR_CONNECTION_INVALID);
 
@@ -242,31 +247,30 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 			// if they were holding a reference on us, it gets released
 			Block_release(this->event_handler);
 			this->event_handler = NULL;
+
+			// we've been cancelled; this is the very last event we'll ever receive, so we can release our internal reference now.
+			// note that this doesn't mean we instantly die; the user might still be holding their reference on us
+			_os_object_release_internal(self);
 		} break;
 
+		// NOTE: earlier, i thought that this event was only ever called once per session and always after the cancellation event (because the comments in mach_private.h seemed to suggest it).
+		//       i have discovered this is not the case. this event is fired for each port that needs to be released and can fire before DISPATCH_MACH_CANCELED is fired.
 		case DISPATCH_MACH_DISCONNECTED: {
 			mach_msg_header_t* header = dispatch_mach_msg_get_msg(message, NULL);
 
 			if (MACH_MSGH_BITS_LOCAL(header->msgh_bits) & MACH_MSG_TYPE_MAKE_SEND_ONCE) {
 				// we were expecting a reply, so we need to release the reply port
-				xpc_mach_port_release_receive(header->msgh_local_port);
+				xpc_assumes_zero(xpc_mach_port_release_receive(header->msgh_local_port));
 			}
 
 			mach_msg_destroy(header);
-
-			if (this->is_cancelled) {
-				// we've been cancelled, so this is the very last event we'll ever receive
-				// we can release our internal reference
-				// note that this doesn't mean we instantly die; the user might still be holding their reference on us
-				_os_object_release_internal(self);
-			}
 		} break;
 
 		case DISPATCH_MACH_REPLY_RECEIVED: {
 			mach_msg_header_t* header = dispatch_mach_msg_get_msg(message, NULL);
 
 			xpc_assert(MACH_MSGH_BITS_REMOTE(header->msgh_bits) & MACH_MSG_TYPE_MOVE_SEND_ONCE);
-			xpc_mach_port_release_receive(header->msgh_local_port);
+			xpc_assumes_zero(xpc_mach_port_release_receive(header->msgh_local_port));
 
 			mach_msg_destroy(header);
 		} break;
@@ -284,8 +288,8 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 				XPC_CLASS(serializer)* serializer = [[[XPC_CLASS(serializer) alloc] initWithoutHeader] autorelease];
 				dispatch_mach_msg_t checkinMessage = NULL;
 
-				// get rid of our old send port and make a new one to send to the server
-				xpc_mach_port_release_send(this->send_port);
+				// make a new send port to send to the server
+				// we can just overwrite the old port because dispatch_mach is supposed to pass it to DISPATCH_MACH_DISCONNECTED for us to clean it up
 				this->send_port = xpc_mach_port_create_send_receive();
 
 				if (![serializer writePort: this->send_port type: MACH_MSG_TYPE_MOVE_RECEIVE]) {
@@ -310,7 +314,7 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 		} break;
 
 		default: {
-			xpc_log(XPC_LOG_NOTICE, "connection %p: received unexpected event %lu (%s)", self, reason, reason_to_string(reason));
+			xpc_log(connection, "connection %p: received unexpected event %lu (%s)", self, reason, reason_to_string(reason));
 
 			if (message) {
 				mach_msg_header_t* header = dispatch_mach_msg_get_msg(message, NULL);
@@ -323,7 +327,7 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 static bool dmxh_direct_message_handler(void* context, dispatch_mach_reason_t reason, dispatch_mach_msg_t message, mach_error_t error) {
 	XPC_CLASS(connection)* self = context;
 
-	xpc_log(XPC_LOG_DEBUG, "connection %p: direct message handler got event %lu (%s)\n", self, reason, reason_to_string(reason));
+	xpc_log_debug(connection, "connection %p: direct message handler got event %lu (%s)\n", self, reason, reason_to_string(reason));
 
 	switch (reason) {
 		case DISPATCH_MACH_MESSAGE_SEND_FAILED: /* fallthrough */
@@ -355,7 +359,7 @@ static void dmxh_async_reply_handler(void* self_context, dispatch_mach_reason_t 
 	mach_port_t localPort = header->msgh_local_port;
 	audit_token_t* token = NULL;
 
-	xpc_log(XPC_LOG_DEBUG, "connection %p: async reply handler got event %lu (%s)\n", self, reason, reason_to_string(reason));
+	xpc_log_debug(connection, "connection %p: async reply handler got event %lu (%s)\n", self, reason, reason_to_string(reason));
 
 	switch (reason) {
 		case DISPATCH_MACH_MESSAGE_RECEIVED: {
@@ -367,6 +371,7 @@ static void dmxh_async_reply_handler(void* self_context, dispatch_mach_reason_t 
 
 			if (header->msgh_size == sizeof(mach_msg_header_t)) {
 				// if the message is only a header, it means that the remote peer disconnected/crashed
+				xpc_log(connection, "connection %p: async reply handler received empty message due to peer disconnect", this);
 				mach_msg_destroy(header);
 				if (this->service_name) {
 					result = XPC_ERROR_CONNECTION_INTERRUPTED;
@@ -385,6 +390,7 @@ static void dmxh_async_reply_handler(void* self_context, dispatch_mach_reason_t 
 		} break;
 
 		case DISPATCH_MACH_ASYNC_WAITER_DISCONNECTED: {
+			xpc_log(connection, "connection %p: async reply handler was informed that we were cancelled while waiting", this);
 			mach_msg_destroy(header);
 			if (this->service_name) {
 				result = XPC_ERROR_CONNECTION_INTERRUPTED;
@@ -403,7 +409,7 @@ handle_it:
 
 	xpc_connection_reply_context_destroy(context);
 
-	xpc_mach_port_release_receive(localPort);
+	xpc_assumes_zero(xpc_mach_port_release_receive(localPort));
 };
 
 static bool dmxh_enable_sigterm_notification(void* context) {
@@ -521,10 +527,16 @@ OS_OBJECT_USES_XREF_DISPOSE();
 {
 	XPC_THIS_DECL(connection);
 
-	if (this->is_server_peer) {
-		// server peer connections can only be released by the server
+	xpc_log_debug(connection, "connection %p: got xref disposed", this);
+
+	if (this->is_server_peer && self.parentServer) {
+		// server peer connections can only be released by the server.
+		// the `self.parentServer` condition checks for whether the server already released us
+		// (it sets `parentServer` to nil when it does; if it already did, then all is fine)
 		xpc_abort("server peer connection released by user");
 	}
+
+	self.parentServer = nil;
 
 	if (this->suspension_count > 0) {
 		xpc_abort("last reference to a suspended connection was released");
@@ -544,19 +556,24 @@ OS_OBJECT_USES_XREF_DISPOSE();
 {
 	XPC_THIS_DECL(connection);
 
+	xpc_log_debug(connection, "connection %p: got dealloc'ed", this);
+
 	pthread_rwlock_destroy(&this->activated_lock);
 	pthread_rwlock_destroy(&this->server_peers_lock);
 	pthread_rwlock_destroy(&this->remote_credentials_lock);
 
-	xpc_mach_port_release_send(this->send_port);
-	xpc_mach_port_release_send(this->checkin_port);
-	xpc_mach_port_release_receive(this->recv_port);
+	xpc_assumes_zero(xpc_mach_port_release_send(this->send_port));
+	xpc_assumes_zero(xpc_mach_port_release_send(this->checkin_port));
+	xpc_assumes_zero(xpc_mach_port_release_receive(this->recv_port));
 
 	[this->mach_ctx release];
 
+	// all the server peers should already have been released by DISPATCH_MACH_DISCONNECTED.
 	xpc_genarr_connection_destroy(&this->server_peers);
 
-	Block_release(this->event_handler);
+	if (this->event_handler) {
+		Block_release(this->event_handler);
+	}
 
 	if (this->finalizer) {
 		this->finalizer(this->user_context);
@@ -628,6 +645,7 @@ OS_OBJECT_USES_XREF_DISPOSE();
 		this->mach_ctx = dispatch_mach_create_4libxpc("org.darlinghq.libxpc.endpoint-peer", NULL, self, dispatch_mach_handler);
 
 		if (xpc_mach_port_retain_send(endpoint.port) != KERN_SUCCESS) {
+			xpc_log_error(connection, "failed to retain endpoint send port %d", endpoint.port);
 			[self release];
 			return nil;
 		}
@@ -709,6 +727,7 @@ OS_OBJECT_USES_XREF_DISPOSE();
 		// named server
 		status = bootstrap_check_in(bootstrap_port, this->service_name, &this->recv_port);
 		if (status != KERN_SUCCESS) {
+			xpc_log_error(connection, "failed to checkin for service with name \"%s\"", this->service_name);
 			goto error_out;
 		}
 	} else if (this->is_listener) {
@@ -720,6 +739,7 @@ OS_OBJECT_USES_XREF_DISPOSE();
 		// client for named server
 		status = bootstrap_look_up(bootstrap_port, this->service_name, &this->checkin_port);
 		if (status != KERN_SUCCESS) {
+			xpc_log_error(connection, "failed to lookup service with name \"%s\"", this->service_name);
 			goto error_out;
 		}
 	} else if (this->is_server_peer) {

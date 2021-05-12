@@ -29,6 +29,8 @@
 
 #define DEFAULT_RECEIVE_SIZE 256
 
+XPC_LOGGER_DEF(pipe);
+
 //
 // implementation notes:
 //
@@ -99,7 +101,7 @@ XPC_CLASS_HEADER(pipe);
 		case MACH_SEND_MSG_TOO_SMALL: {
 			// these are hard to clean up because the message may have been partially consumed by the kernel,
 			// so we just don't clean them up
-			xpc_log(XPC_LOG_WARNING, "pipe: message could not be cleaned up");
+			xpc_log_error(pipe, "pipe: message could not be cleaned up");
 
 			status = EIO;
 		} break;
@@ -211,7 +213,7 @@ out:
 
 			status = 0;
 		} else {
-			xpc_log(XPC_LOG_ERROR, "pipe: received invalid message with ID: %u", header->msgh_id);
+			xpc_log_fault(pipe, "pipe: received invalid message with ID: %u", header->msgh_id);
 
 			mach_msg_destroy(header);
 
@@ -583,7 +585,7 @@ retry:
 
 				status = 0;
 			} else {
-				xpc_log(XPC_LOG_ERROR, "pipe: received invalid reply message with ID: %u", header->msgh_id);
+				xpc_log_error(pipe, "pipe: received invalid reply message with ID: %u", header->msgh_id);
 
 				mach_msg_destroy(header);
 

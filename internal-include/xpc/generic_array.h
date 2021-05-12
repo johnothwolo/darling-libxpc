@@ -61,7 +61,8 @@
 	static bool xpc_genarr_ ## name ## _insert(xpc_genarr_ ## name ## _t* genarr, size_t index, type const* value); \
 	static size_t xpc_genarr_ ## name ## _length(xpc_genarr_ ## name ## _t* genarr); \
 	static type* xpc_genarr_ ## name ## _data(xpc_genarr_ ## name ## _t* genarr); \
-	static void xpc_genarr_ ## name ## _iterate(xpc_genarr_ ## name ## _t* genarr, void* context, xpc_genarr_ ## name ## _iterator_f iterator);
+	static void xpc_genarr_ ## name ## _iterate(xpc_genarr_ ## name ## _t* genarr, void* context, xpc_genarr_ ## name ## _iterator_f iterator); \
+	static void xpc_genarr_ ## name ## _clear(xpc_genarr_ ## name ## _t* genarr);
 
 #define XPC_GENARR_SEARCH_DECL(name, type, static) \
 	typedef struct xpc_genarr_ ## name ## _search_context_s { \
@@ -85,17 +86,7 @@
 		genarr->item_dtor = item_dtor; \
 	}; \
 	static void xpc_genarr_ ## name ## _destroy(xpc_genarr_ ## name ## _t* genarr) { \
-		for (size_t i = 0; i < genarr->length; ++i) { \
-			if (genarr->item_dtor) { \
-				genarr->item_dtor(&genarr->array[i]); \
-			} \
-		} \
-		if (genarr->array) {\
-			free(genarr->array); \
-		} \
-		genarr->array = NULL; \
-		genarr->length = 0; \
-		genarr->size = 0; \
+		xpc_genarr_ ## name ## _clear(genarr); \
 	}; \
 	static bool xpc_genarr_ ## name ## _get(xpc_genarr_ ## name ## _t* genarr, size_t index, type* value) { \
 		bool result = false; \
@@ -194,7 +185,20 @@
 				break; \
 			} \
 		} \
-	};
+	}; \
+	static void xpc_genarr_ ## name ## _clear(xpc_genarr_ ## name ## _t* genarr) { \
+		for (size_t i = 0; i < genarr->length; ++i) { \
+			if (genarr->item_dtor) { \
+				genarr->item_dtor(&genarr->array[i]); \
+			} \
+		} \
+		if (genarr->array) {\
+			free(genarr->array); \
+		} \
+		genarr->array = NULL; \
+		genarr->length = 0; \
+		genarr->size = 0; \
+	}; \
 
 #define XPC_GENARR_SEARCH_DEF(name, type, static) \
 	static bool xpc_genarr_ ## name ## _search_iterator(void* context, size_t index, type* value) { \

@@ -246,18 +246,14 @@ XPC_NORETURN
 void _xpc_assertion_failed(const char* function, const char* file, size_t line, const char* expression);
 
 #if XPC_DEBUG
-	#define xpc_assert(x) do { \
-			if (!(x)) _xpc_assertion_failed(__PRETTY_FUNCTION__, __FILE__, __LINE__, #x);\
-		} while (0)
+	#define xpc_assert(x) ({ \
+			if (!(x)) { \
+				_xpc_assertion_failed(__PRETTY_FUNCTION__, __FILE__, __LINE__, OS_STRINGIFY(x)); \
+			} \
+		})
 #else
 	#define xpc_assert(x)
 #endif
-
-#define XPC_LOG_DEBUG   OS_LOG_TYPE_DEBUG
-#define XPC_LOG_WARNING OS_LOG_TYPE_INFO
-#define XPC_LOG_ERROR   OS_LOG_TYPE_ERROR
-#define XPC_LOG_NOTICE  OS_LOG_TYPE_INFO
-#define XPC_LOG_INFO    OS_LOG_TYPE_INFO
 
 /**
  * Determines whether logging should be allowed right now.
@@ -267,18 +263,36 @@ void _xpc_assertion_failed(const char* function, const char* file, size_t line, 
 bool xpc_should_log(void);
 
 /**
- * Returns a logger object that can be used for logging XPC messages with os_log
+ * Returns a logger object that can be used for logging general XPC messages with os_log
  */
 os_log_t xpc_get_log(void);
 
+#define XPC_LOGGER_DEF(_category) \
+	static os_log_t xpc_ ## _category ## _get_log(void) { \
+		static os_log_t logger = NULL; \
+		static dispatch_once_t token; \
+		dispatch_once(&token, ^{ \
+			logger = os_log_create("org.darlinghq.libxpc", #_category); \
+		}); \
+		return logger; \
+	};
+
+#define XPC_LOGGER(_category) (xpc_ ## _category ## _get_log())
+
 /**
- * Logs a message with the given priority.
+ * Logs a message of the given type.
  */
-#define xpc_log(type, format, ...) ({ \
+#define xpc_log_with_type(_category, _type, ...) ({ \
 		if (xpc_should_log()) { \
-			os_log_with_type(xpc_get_log(), type, "%s:%lu: %s: " format, __FILE__, (long unsigned)__LINE__, __PRETTY_FUNCTION__, ##__VA_ARGS__); \
+			os_log_with_type(XPC_LOGGER(_category), _type, ##__VA_ARGS__); \
 		} \
 	})
+
+#define xpc_log(_category, ...) xpc_log_with_type(_category, OS_LOG_TYPE_DEFAULT, ##__VA_ARGS__)
+#define xpc_log_info(_category, ...) xpc_log_with_type(_category, OS_LOG_TYPE_INFO, ##__VA_ARGS__)
+#define xpc_log_debug(_category, ...) xpc_log_with_type(_category, OS_LOG_TYPE_DEBUG, ##__VA_ARGS__)
+#define xpc_log_error(_category, ...) xpc_log_with_type(_category, OS_LOG_TYPE_ERROR, ##__VA_ARGS__)
+#define xpc_log_fault(_category, ...) xpc_log_with_type(_category, OS_LOG_TYPE_FAULT, ##__VA_ARGS__)
 
 /**
  * Prints a message indicating that a stub was called.
@@ -299,5 +313,39 @@ bool xpc_path_is_file(const char* path);
  * Returns a copy of the path for the main executable. Must be freed.
  */
 char* xpc_copy_main_executable_path(void);
+
+/**
+ * Logs a message that an assumption failed. Also a useful breakpoint location while debugging.
+ */
+void _xpc_assumption_failed(const char* function, const char* file, size_t line, const char* expression);
+
+/**
+ * Indicates that the given expression (the first argument) is assumed to have the given value (the second argument).
+ * Assumptions are like assertions, but they're always enabled in both debug and release mode and will not abort the process if they fail.
+ */
+#define xpc_assumes(expression, assumed_value) ({ \
+		if ((expression) != (assumed_value)) { \
+			_xpc_assumption_failed(__PRETTY_FUNCTION__, __FILE__, __LINE__, OS_STRINGIFY((expression) == (assumed_value))); \
+		} \
+	})
+
+/**
+ * Like `xpc_assumes`, but assumes that the given expression (the first argument) DOES NOT have the given value (the second argument).
+ */
+#define xpc_assumes_not(expression, assumed_value) ({ \
+		if ((expression) == (assumed_value)) { \
+			_xpc_assumption_failed(__PRETTY_FUNCTION__, __FILE__, __LINE__, OS_STRINGIFY((expression) != (assumed_value))); \
+		} \
+	})
+
+/**
+ * A derivation of `xpc_assumes` where the assumed value is 0. This is just for convenience/clarity.
+ */
+#define xpc_assumes_zero(expression) xpc_assumes(expression, 0)
+
+/**
+ * A derivation of `xpc_assumes_not` where the assumed value is 0. This is just for convenience/clarity.
+ */
+#define xpc_assumes_not_zero(expression) xpc_assumes_not(expression, 0)
 
 #endif // _XPC_UTIL_H_

@@ -40,6 +40,7 @@ XPC_CLASS_HEADER(dictionary);
 - (void)dealloc
 {
 	XPC_THIS_DECL(dictionary);
+	self.associatedConnection = nil;
 	while (!LIST_EMPTY(&this->head)) {
 		xpc_dictionary_entry_t entry = LIST_FIRST(&this->head);
 		[self removeEntry: entry];

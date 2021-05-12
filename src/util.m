@@ -26,7 +26,10 @@
 #include <stdio.h>
 #include <mach-o/dyld.h>
 
-static bool enable_stub_messages = false;
+static bool verbose_stub_messages = false;
+
+XPC_LOGGER_DEF(stubs);
+XPC_LOGGER_DEF(assumptions);
 
 bool xpc_should_log(void) {
 	static bool enabled = true;
@@ -247,12 +250,14 @@ void _xpc_assertion_failed(const char* function, const char* file, size_t line, 
 };
 
 void xpc_stub_init(void) {
-	enable_stub_messages = getenv("STUB_VERBOSE") != NULL;
+	verbose_stub_messages = getenv("STUB_VERBOSE") != NULL;
 };
 
 void _xpc_stub(const char* function, const char* file, size_t line) {
-	if (enable_stub_messages) {
-		printf("libxpc: stub called %s (at %s:%zu)\n", function, file, line);
+	xpc_log(stubs, "libxpc stub called: %s (at %s:%zu)", function, file, line);
+
+	if (verbose_stub_messages) {
+		printf("libxpc stub called: %s (at %s:%zu)\n", function, file, line);
 		fflush(stdout);
 	}
 };
@@ -291,4 +296,8 @@ os_log_t xpc_get_log(void) {
 		logger = os_log_create("org.darlinghq.libxpc", "general");
 	});
 	return logger;
+};
+
+void _xpc_assumption_failed(const char* function, const char* file, size_t line, const char* expression) {
+	xpc_log_error(assumptions, "assumption failed in %s at %s:%zu: %s", function, file, line, expression);
 };
