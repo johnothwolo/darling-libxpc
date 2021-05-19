@@ -271,11 +271,12 @@ XPC_CLASS_HEADER(array);
 		goto error_out;
 	}
 
+	// the element/entry count is included in the content length
+	contentStartOffset = deserializer.offset;
+
 	if (![deserializer readU32: &entryCount]) {
 		goto error_out;
 	}
-
-	contentStartOffset = deserializer.offset;
 
 	result = [[[self class] alloc] initWithObjects: NULL count: 0];
 
@@ -315,11 +316,12 @@ error_out:
 		goto error_out;
 	}
 
+	// the element/entry count is included in the content length
+	contentStartOffset = serializer.offset;
+
 	if (![serializer writeU32: this->size]) {
 		goto error_out;
 	}
-
-	contentStartOffset = serializer.offset;
 
 	for (NSUInteger i = 0; i < this->size; ++i) {
 		XPC_CLASS(object)* object = this->array[i];

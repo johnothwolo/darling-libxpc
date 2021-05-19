@@ -41,8 +41,8 @@ extern "C" {
 // structures/values describing the over-the-wire format
 //
 
-// "XPC!"
-#define XPC_SERIAL_MAGIC 0x58504321
+// "@XPC"
+#define XPC_SERIAL_MAGIC 0x40585043
 
 #define XPC_SERIAL_CURRENT_VERSION 5
 

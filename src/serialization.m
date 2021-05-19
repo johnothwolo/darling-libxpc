@@ -171,7 +171,7 @@ XPC_CLASS_HEADER(serializer);
 - (dispatch_mach_msg_t)finalizeWithRemotePort: (mach_port_t)remotePort localPort: (mach_port_t)localPort asReply: (BOOL)asReply expectingReply: (BOOL)expectingReply messageID: (uint32_t)messageID
 {
 	XPC_THIS_DECL(serializer);
-	size_t messageSize = sizeof(mach_msg_base_t);
+	size_t messageSize = sizeof(mach_msg_header_t);
 	mach_msg_base_t* base = NULL;
 	mach_msg_descriptor_t* descriptors = NULL;
 	void* body = NULL;
@@ -197,6 +197,11 @@ XPC_CLASS_HEADER(serializer);
 		}
 	}
 
+	// if we have ports, the message must be complex so we need the complex body
+	if (descriptorCount > 0) {
+		messageSize += sizeof(mach_msg_body_t);
+	}
+
 	// add in the length of the actual serialized XPC data
 	messageSize += this->length;
 
@@ -206,7 +211,9 @@ XPC_CLASS_HEADER(serializer);
 		return NULL;
 	}
 	descriptors = (mach_msg_descriptor_t*)((char*)base + sizeof(*base));
-	body = descriptors;
+
+	// if we have no descriptors, we don't need to include the count
+	body = (descriptorCount > 0) ? (void*)descriptors : (void*)((char*)base + sizeof(base->header));
 
 	// next, fill in header information
 	base->header.msgh_id = messageID;
@@ -214,7 +221,10 @@ XPC_CLASS_HEADER(serializer);
 	base->header.msgh_bits = MACH_MSGH_BITS(asReply ? MACH_MSG_TYPE_MOVE_SEND_ONCE : MACH_MSG_TYPE_COPY_SEND, expectingReply ? MACH_MSG_TYPE_MAKE_SEND_ONCE : 0) | ((descriptorCount > 0) ? MACH_MSGH_BITS_COMPLEX : 0);
 	base->header.msgh_remote_port = remotePort;
 	base->header.msgh_local_port = expectingReply ? localPort : MACH_PORT_NULL;
-	base->body.msgh_descriptor_count = descriptorCount;
+
+	if (descriptorCount > 0) {
+		base->body.msgh_descriptor_count = descriptorCount;
+	}
 
 	// and transfer the port descriptors
 	for (size_t i = 0; i < sizeof(this->port_arrays) / sizeof(*this->port_arrays); ++i) {
@@ -472,7 +482,9 @@ XPC_CLASS_HEADER(deserializer);
 		size_t messageSize = 0;
 		const mach_msg_base_t* base = (const mach_msg_base_t*)dispatch_mach_msg_get_msg(message, &messageSize);
 		const mach_msg_descriptor_t* descriptors = (const mach_msg_descriptor_t*)((const char*)base + sizeof(mach_msg_base_t));
-		const void* body = descriptors;
+
+		// if it's not complex, it doesn't contain a descriptor count; the XPC data comes immediately after the header
+		const void* body = MACH_MSGH_BITS_IS_COMPLEX(base->header.msgh_bits) ? (const void*)descriptors : (const void*)((const char*)base + sizeof(base->header));
 
 		// don't retain it; we own it now
 		this->mach_msg = message;
