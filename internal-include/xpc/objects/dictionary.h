@@ -44,6 +44,7 @@ struct xpc_dictionary_s {
 	XPC_CLASS(connection)* associatedConnection;
 	mach_port_t incoming_port;
 	mach_port_t outgoing_port;
+	audit_token_t associated_audit_token;
 };
 
 @interface XPC_CLASS_INTERFACE(dictionary)
@@ -89,6 +90,9 @@ struct xpc_dictionary_s {
 
 // useful extensions:
 - (XPC_CLASS(string)*)stringForKey: (const char*)key;
+
+- (void)setAssociatedAuditToken: (audit_token_t*)auditToken;
+- (void)copyAssociatedAuditTokenTo: (audit_token_t*)auditToken;
 
 @end
 

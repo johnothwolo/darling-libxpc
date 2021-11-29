@@ -53,8 +53,6 @@ XPC_TYPE(_xpc_type_file_transfer);
 
 int _xpc_runtime_is_app_sandboxed();
 
-xpc_object_t _od_rpc_call(const char *procname, xpc_object_t payload, xpc_pipe_t (*get_pipe)(bool));
-
 xpc_object_t xpc_create_with_format(const char * format, ...);
 
 xpc_object_t xpc_create_reply_with_format(xpc_object_t original, const char * format, ...);

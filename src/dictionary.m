@@ -134,6 +134,7 @@ XPC_CLASS_HEADER(dictionary);
 	if (self = [super init]) {
 		XPC_THIS_DECL(dictionary);
 		LIST_INIT(&this->head);
+		memset(&this->associated_audit_token, 0xff, sizeof(audit_token_t));
 	}
 	return self;
 }
@@ -297,6 +298,28 @@ XPC_CLASS_HEADER(dictionary);
 	}
 
 	return result;
+}
+
+- (void)setAssociatedAuditToken: (audit_token_t*)auditToken
+{
+	XPC_THIS_DECL(dictionary);
+
+	if (!auditToken) {
+		return;
+	}
+
+	memcpy(&this->associated_audit_token, auditToken, sizeof(audit_token_t));
+}
+
+- (void)copyAssociatedAuditTokenTo: (audit_token_t*)auditToken
+{
+	XPC_THIS_DECL(dictionary);
+
+	if (!auditToken) {
+		return;
+	}
+
+	memcpy(auditToken, &this->associated_audit_token, sizeof(audit_token_t));
 }
 
 @end
@@ -504,7 +527,9 @@ xpc_connection_t xpc_dictionary_get_remote_connection(xpc_object_t xdict) {
 
 XPC_EXPORT
 void xpc_dictionary_get_audit_token(xpc_object_t xdict, audit_token_t* token) {
-
+	TO_OBJC_CHECKED(dictionary, xdict, dict) {
+		[dict copyAssociatedAuditTokenTo: token];
+	}
 };
 
 //

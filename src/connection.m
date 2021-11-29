@@ -225,6 +225,9 @@ static void dispatch_mach_handler(void* context, dispatch_mach_reason_t reason, 
 				[message retain]; // because the deserializer consumes a reference on the message
 				dict = [XPC_CLASS(deserializer) process: message];
 				dict.associatedConnection = self;
+				if (token) {
+					[dict setAssociatedAuditToken: token];
+				}
 
 				this->event_handler(dict);
 			}
