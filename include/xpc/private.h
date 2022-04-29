@@ -35,6 +35,10 @@
 
 __BEGIN_DECLS
 
+typedef struct {
+
+} *xpc_event_publisher_t;
+
 XPC_EXPORT
 XPC_TYPE(_xpc_type_serializer);
 #define XPC_TYPE_SERIALIZER (&_xpc_type_serializer)
